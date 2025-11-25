@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -87,24 +88,6 @@ fun TVSeriesDetailsScreen(
     val fileNameEncoder = URLEncoder.encode(fileName, "UTF-8")
     val connectionNameEncoder = URLEncoder.encode(connectionName, "UTF-8")
 
-    // 3. 获取 TV 详情 (整体)
-//    LaunchedEffect(seriesId) {
-//        if (seriesId > 0) {
-//            movieViewModel.getTVSeriesDetails(seriesId)
-//        }
-//    }
-//
-//
-//    // 4. 获取 TV 单集详情 (如果季数和集数有效)
-//    LaunchedEffect(seriesId, currentSeason, currentEpisode) {
-//        if (seriesId > 0 && currentSeason > 0 && currentEpisode > 0) {
-//            movieViewModel.getTVEpisodeDetails(
-//                seriesId = seriesId,
-//                seasonNumber = currentSeason,
-//                episodeNumber = currentEpisode
-//            )
-//        }
-//    }
     val decodedUri = remember(videoUri) {
         java.net.URLDecoder.decode(videoUri, "UTF-8")
     }
@@ -137,7 +120,12 @@ fun TVSeriesDetailsScreen(
                     currentEpisode = currentEpisode,
                     onPlayClick = {
                         navController.navigate("VideoPlayer/$videoUriEncoder/$dataSourceType/$fileNameEncoder/$connectionNameEncoder")
-                    }
+                    },
+                    // *** [修改 1] 传递这些信息给 TVSeriesContent ***
+                    dataSourceType = dataSourceType,
+                    fileName = fileName,
+                    connectionName = connectionName
+                    // ***********************************************
                 )
             }
 
@@ -182,13 +170,24 @@ private fun TVSeriesContent(
     tvEpisodeState: Resource<TVEpisode>, // 接收 Resource 状态
     currentSeason: Int,
     currentEpisode: Int,
-    onPlayClick: () -> Unit
+    onPlayClick: () -> Unit,
+    // *** [修改 2] 添加新的参数 ***
+    dataSourceType: String,
+    fileName: String,
+    connectionName: String
+    // *************************
 ) {
     // 控制剧集总体简介弹窗
     var showFullDescDialog by remember { mutableStateOf(false) }
     val watchButtonsFR = remember { FocusRequester() }
+    // 【修改点 1】新增 LazyListState
+    val listState = rememberLazyListState()
     LaunchedEffect(Unit) {
-        watchButtonsFR.requestFocus()
+        // 【修改点 2】先滚动到顶部
+        //watchButtonsFR.requestFocus()
+        listState.scrollToItem(0)
+        // 【修改点 3】再请求焦点
+
     }
     // 1. 背景层 (与 Movie 保持一致)
     Box(modifier = Modifier.fillMaxSize()) {
@@ -267,12 +266,12 @@ private fun TVSeriesContent(
                 .weight(1f)
                 .fillMaxSize(),
             contentPadding = PaddingValues(top = 32.dp, bottom = 32.dp, end = 48.dp),
-            verticalArrangement = Arrangement.Center
+            state = listState,
         ) {
             // === 剧集标题 ===
             item {
                 Surface(
-                    onClick = { },
+                    onClick = { onPlayClick()},
                     modifier = Modifier.offset(x = (-8).dp),
                     shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(8.dp)),
                     colors = ClickableSurfaceDefaults.colors(
@@ -457,8 +456,64 @@ private fun TVSeriesContent(
                         .focusRequester(watchButtonsFR),
                     onClick = onPlayClick
                 )
-                Spacer(modifier = Modifier.height(48.dp))
+                Spacer(modifier = Modifier.height(16.dp))
             }
+
+            // *** [修改 3] 新增本地文件/连接信息区域，并用 Surface 包裹 ***
+            item {
+                // 使用 TV Material3 的 Surface 作为容器，使其具有可点击的样式和焦点效果
+                Surface(
+                    onClick = { /* 保持为空，仅用于样式 */ }, // 用户要求：onClick 设为空
+                    shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(8.dp)),
+                    colors = ClickableSurfaceDefaults.colors(
+                        containerColor = Color.Transparent,
+                        focusedContainerColor = Color.White.copy(alpha = 0.1f),
+                        pressedContainerColor = Color.White.copy(alpha = 0.2f)
+                    ),
+                    border = ClickableSurfaceDefaults.border(
+                        focusedBorder = Border(BorderStroke(1.dp, Color.White.copy(alpha = 0.5f)))
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(
+                        modifier = Modifier.padding(8.dp) // 内边距
+                    ) {
+                        Text(
+                            text = "• 播放文件信息",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        // 文件名
+                        Text(
+                            text = "文件名: $fileName",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color.LightGray,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        // 数据源类型
+                        Text(
+                            text = "数据源类型: $dataSourceType",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color.LightGray
+                        )
+                        // 连接名 (如果存在)
+                        if (connectionName.isNotEmpty()) {
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = "连接名: $connectionName",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Color.LightGray
+                            )
+                        }
+                    }
+                }
+                Spacer(modifier = Modifier.height(48.dp)) // 保持底部间距
+            }
+            // *************************************************************
         }
     }
 

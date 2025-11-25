@@ -16,14 +16,26 @@ import org.mz.mzdkplayer.data.local.MediaDao
 import org.mz.mzdkplayer.data.local.MediaCacheEntity
 
 class MediaLibraryViewModel(private val mediaDao: MediaDao) : ViewModel() {
-
+    // 用于存储当前选中的电影版本列表（给弹窗用）
+    private val _selectedMovieVersions = MutableStateFlow<List<MediaCacheEntity>>(emptyList())
+    val selectedMovieVersions = _selectedMovieVersions.asStateFlow()
     // 电影分页数据流
     val pagedMovies: Flow<PagingData<MediaCacheEntity>> = Pager(
         config = PagingConfig(pageSize = 20, enablePlaceholders = false)
     ) {
         mediaDao.getMoviesPaged()
     }.flow.cachedIn(viewModelScope)
+    // 加载特定电影的所有版本
+    fun loadMovieVersions(tmdbId: Int) {
+        viewModelScope.launch {
+            _selectedMovieVersions.value = mediaDao.getMovieVersions(tmdbId)
+        }
+    }
 
+    // 清空电影选中状态
+    fun clearSelectedMovieVersions() {
+        _selectedMovieVersions.value = emptyList()
+    }
     // 电视剧分页数据流
     val pagedTVSeries: Flow<PagingData<MediaCacheEntity>> = Pager(
         config = PagingConfig(pageSize = 20, enablePlaceholders = false)

@@ -1,5 +1,7 @@
 package org.mz.mzdkplayer.ui.screen.history
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -7,6 +9,7 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.runtime.*
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
@@ -14,7 +17,9 @@ import androidx.navigation.NavHostController
 import androidx.tv.material3.*
 import org.mz.mzdkplayer.di.RepositoryProvider
 import org.mz.mzdkplayer.tool.viewModelWithFactory
+import org.mz.mzdkplayer.ui.screen.common.DashboardTopBarItemIndicator
 import org.mz.mzdkplayer.ui.screen.vm.MediaHistoryViewModel
+import org.mz.mzdkplayer.ui.theme.MyTabColors
 import org.mz.mzdkplayer.ui.theme.myListItemCoverColor
 import java.net.URLEncoder
 
@@ -30,6 +35,7 @@ fun MediaHistoryScreen(
     // 简单的 Tab 切换状态
     var selectedTab by remember { mutableIntStateOf(0) } // 0: Video, 1: Audio
 
+    val isTabRowFocused by remember { mutableStateOf(false) }
     Column(modifier = Modifier.fillMaxSize().padding(24.dp)) {
 
         Text(text = "播放历史", style = MaterialTheme.typography.headlineMedium, color = Color.White)
@@ -37,20 +43,39 @@ fun MediaHistoryScreen(
         Spacer(modifier = Modifier.height(16.dp))
 
         // Tab Row
-        TabRow(selectedTabIndex = selectedTab) {
+        TabRow(selectedTabIndex = selectedTab, indicator  = { tabPositions, _ ->
+            if (selectedTab >= 0) {
+                DashboardTopBarItemIndicator(
+                    currentTabPosition = tabPositions[selectedTab],
+                    anyTabFocused = isTabRowFocused,
+                    shape = ShapeDefaults.ExtraSmall,
+                    activeColor = Color(0xFF000000),
+                    inactiveColor =Color(0xFFFFFFFF),
+                )
+            }
+        }) {
             Tab(
                 selected = selectedTab == 0,
+
                 onFocus = { selectedTab = 0 },
                 onClick = { selectedTab = 0 }
             ) {
-                Text("视频 (${videoHistory.size})", modifier = Modifier.padding(12.dp))
+                val textColor by animateColorAsState(
+                    targetValue = if (selectedTab == 0) Color.Black else Color.White,
+                    animationSpec = tween(durationMillis = 100)
+                )
+                Text("视频 (${videoHistory.size})", modifier = Modifier.padding(12.dp),color =textColor)
             }
             Tab(
                 selected = selectedTab == 1,
                 onFocus = { selectedTab = 1 },
                 onClick = { selectedTab = 1 }
             ) {
-                Text("音频 (${audioHistory.size})", modifier = Modifier.padding(12.dp))
+                val textColor by animateColorAsState(
+                    targetValue = if (selectedTab == 1) Color.Black else Color.White,
+                    animationSpec = tween(durationMillis = 100)
+                )
+                Text("音频 (${audioHistory.size})", modifier = Modifier.padding(12.dp),color =textColor,)
             }
         }
 

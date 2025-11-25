@@ -30,9 +30,13 @@ import androidx.tv.material3.Button
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Surface
 import androidx.tv.material3.Text
+// 【新增】导入 ListItem 和 ExperimentalTvMaterial3Api
+import androidx.tv.material3.ListItem
+import androidx.tv.material3.ExperimentalTvMaterial3Api
 import org.mz.mzdkplayer.data.local.MediaCacheEntity
 import org.mz.mzdkplayer.ui.screen.common.MediaCard
 import org.mz.mzdkplayer.ui.screen.vm.MediaLibraryViewModel
+import org.mz.mzdkplayer.ui.theme.myListItemCoverColor
 import java.net.URLEncoder
 
 @Composable
@@ -104,6 +108,8 @@ fun TvLibraryScreen(
     }
 }
 
+// 【修改】使用 ListItem 替换 Button
+@OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
 fun EpisodeSelectionDialog(
     title: String,
@@ -136,17 +142,31 @@ fun EpisodeSelectionDialog(
                     LazyColumn(
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        // 可以进一步按 Season 分组，这里简单列出所有
                         items(episodes) { episode ->
-                            Button(
+                            // 【修改点】使用 ListItem 替换 Button
+                            ListItem(
+                                selected = false, // 焦点控制由 TV 框架自动处理
                                 onClick = { onEpisodeClick(episode) },
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Text(
-                                    text = "第 ${episode.seasonNumber} 季 第 ${episode.episodeNumber} 集" +
-                                            if (!episode.episodeName.isNullOrEmpty()) " - ${episode.episodeName}" else ""
-                                )
-                            }
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = myListItemCoverColor(),
+                                // headlineContent: 显示季集序号
+                                headlineContent = {
+                                    Text(
+                                        text = "第 ${episode.seasonNumber} 季 第 ${episode.episodeNumber} 集",
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                },
+                                // supportingContent: 显示集名称（如果存在）
+                                supportingContent = if (!episode.episodeName.isNullOrEmpty()) {
+                                    {
+                                        Text(text = episode.episodeName)
+                                    }
+                                } else null,
+                                // trailingContent: 可以在右侧放置一个指示图标或文本
+                                trailingContent = {
+                                    Text("选择", color = Color.LightGray)
+                                }
+                            )
                         }
                     }
                 }

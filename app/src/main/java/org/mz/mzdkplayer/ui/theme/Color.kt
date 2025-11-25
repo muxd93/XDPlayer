@@ -6,7 +6,10 @@ import androidx.tv.material3.ButtonColors
 import androidx.tv.material3.ButtonDefaults
 import androidx.tv.material3.ListItemColors
 import androidx.tv.material3.ListItemDefaults
+import androidx.tv.material3.LocalContentColor
 import androidx.tv.material3.MaterialTheme
+import androidx.tv.material3.TabColors
+import androidx.tv.material3.TabDefaults
 
 val Purple80 = Color(0xFFD0BCFF)
 val PurpleGrey80 = Color(0xFFCCC2DC)
@@ -76,5 +79,17 @@ fun MySideListItemColor(): ListItemColors {
         focusedSelectedContainerColor = Color(255, 250, 245),
         focusedContainerColor = Color(255, 250, 245),
         focusedContentColor = Color(80, 70, 60)
+    )
+}
+
+@Composable
+fun MyTabColors(): TabColors {
+    return TabDefaults.pillIndicatorTabColors(
+        contentColor = Color(255, 248, 240),
+        inactiveContentColor = Color(255, 248, 240),
+        selectedContentColor = Color(255, 248, 240),
+        focusedContentColor = Color(255, 248, 240),
+        focusedSelectedContentColor = Color(255, 250, 245),
+
     )
 }

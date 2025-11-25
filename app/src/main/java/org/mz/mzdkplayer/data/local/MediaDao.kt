@@ -22,9 +22,16 @@ interface MediaDao {
     @Update
     suspend fun updateMedia(media: MediaCacheEntity)
 
-    // 1. 分页获取电影
-    @Query("SELECT * FROM media_cache WHERE mediaType = 'movie' ORDER BY title ASC")
+    // 1. 分页获取电影 (修改：增加 GROUP BY tmdbId)
+    // 原来：@Query("SELECT * FROM media_cache WHERE mediaType = 'movie' ORDER BY title ASC")
+    @Query("SELECT * FROM media_cache WHERE mediaType = 'movie' GROUP BY tmdbId ORDER BY title ASC")
     fun getMoviesPaged(): androidx.paging.PagingSource<Int, MediaCacheEntity>
+
+    // ... (其他代码保持不变)
+
+    // 【新增】获取某部电影的所有版本 (用于弹窗选择不同画质/来源)
+    @Query("SELECT * FROM media_cache WHERE mediaType = 'movie' AND tmdbId = :tmdbId")
+    suspend fun getMovieVersions(tmdbId: Int): List<MediaCacheEntity>
 
     // 2. 分页获取电视剧（按 tmdbId 分组，确保一部剧只显示一张卡片）
     @Query("SELECT * FROM media_cache WHERE mediaType = 'tv' GROUP BY tmdbId ORDER BY title ASC")

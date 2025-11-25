@@ -16,10 +16,12 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -80,9 +82,10 @@ fun MovieDetailsScreen(
     movieViewModel: MovieViewModel = viewModelWithFactory {
         RepositoryProvider.createMovieViewModel()
     }
-) {
+)
+{
     val movieDetails by movieViewModel.movieDeResults.collectAsState()
-    val tvSeriesDetails by movieViewModel.tvSeriesResults.collectAsState()
+
     // [新增] 解码 URI 用于数据库查询
     val decodedUri = remember(videoUri) {
         java.net.URLDecoder.decode(videoUri, "UTF-8")
@@ -108,7 +111,11 @@ fun MovieDetailsScreen(
                     onPlayClick = {
 
                         navController.navigate("VideoPlayer/$videoUriEncoder/$dataSourceType/$fileNameEncoder/$connectionNameEncoder")
-                    }
+                    },
+                    // 传递这些信息给 MovieContent
+                    dataSourceType = dataSourceType,
+                    fileName = fileName,
+                    connectionName = connectionName
                 )
             }
 
@@ -147,13 +154,22 @@ fun MovieDetailsScreen(
 @Composable
 private fun MovieContent(
     movie: MovieDetails,
-    onPlayClick: () -> Unit
-) {
+    onPlayClick: () -> Unit,
+    dataSourceType: String,
+    fileName: String,
+    connectionName: String
+)
+{
     // 控制详细简介弹窗的显示
     var showFullDescDialog by remember { mutableStateOf(false) }
     val watchButtonsFR = remember { FocusRequester() }
+    // 【修改点 1】新增 LazyListState
+    val listState = rememberLazyListState()
     LaunchedEffect(Unit) {
-        watchButtonsFR.requestFocus()
+        // 【修改点 2】先滚动到顶部
+        listState.scrollToItem(0)
+        // 【修改点 3】再请求焦点
+        //watchButtonsFR.requestFocus()
     }
     // 1. 背景层
     Box(modifier = Modifier.fillMaxSize()) {
@@ -233,16 +249,31 @@ private fun MovieContent(
                 .weight(1f)
                 .fillMaxSize(),
             contentPadding = PaddingValues(top = 32.dp, bottom = 32.dp, end = 48.dp),
-            verticalArrangement = Arrangement.Center
+            state = listState
         ) {
             // 标题
             item {
+                Surface(
+                    onClick = { onPlayClick()},
+                    modifier = Modifier.offset(x = (-8).dp),
+                    shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(8.dp)),
+                    colors = ClickableSurfaceDefaults.colors(
+                        containerColor = Color.Transparent,
+                        focusedContainerColor = Color.White.copy(alpha = 0.1f),
+                        pressedContainerColor = Color.White.copy(alpha = 0.2f)
+                    ),
+                    border = ClickableSurfaceDefaults.border(
+                        focusedBorder = Border(BorderStroke(1.dp, Color.White.copy(alpha = 0.5f)))
+                    ),
+                ) {
                 Text(
                     text = movie.title ?: "未知标题",
                     style = MaterialTheme.typography.displayMedium,
                     fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(8.dp),
                     color = Color.White
                 )
+                    }
                 if (!movie.originalTitle.isNullOrEmpty() && movie.originalTitle != movie.title) {
                     Text(
                         text = movie.originalTitle,
@@ -255,7 +286,7 @@ private fun MovieContent(
                 Spacer(modifier = Modifier.height(16.dp))
             }
 
-            // 元数据
+            // 元数据 (TMDB 评分、年份、状态、国家/地区、类型)
             item {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Box(
@@ -344,8 +375,64 @@ private fun MovieContent(
                         .focusRequester(watchButtonsFR),
                     onClick = onPlayClick
                 )
+                Spacer(modifier = Modifier.height(16.dp))
+            }
+
+            // *** [修改位置] 新增本地文件/连接信息区域，并用 Surface 包裹 ***
+            item {
+                // 使用 TV Material3 的 Surface 作为容器，使其具有可点击的样式和焦点效果
+                Surface(
+                    onClick = { /* 保持为空，仅用于样式 */ }, // 用户要求：onClick 设为空
+                    shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(8.dp)),
+                    colors = ClickableSurfaceDefaults.colors(
+                        containerColor = Color.Transparent,
+                        focusedContainerColor = Color.White.copy(alpha = 0.1f),
+                        pressedContainerColor = Color.White.copy(alpha = 0.2f)
+                    ),
+                    border = ClickableSurfaceDefaults.border(
+                        focusedBorder = Border(BorderStroke(1.dp, Color.White.copy(alpha = 0.5f)))
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(
+                        modifier = Modifier.padding(8.dp) // 内边距
+                    ) {
+                        Text(
+                            text = "• 播放文件信息",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        // 文件名
+                        Text(
+                            text = "文件名: $fileName",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color.LightGray,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        // 数据源类型
+                        Text(
+                            text = "数据源类型: $dataSourceType",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color.LightGray
+                        )
+                        // 连接名 (如果存在)
+                        if (connectionName.isNotEmpty()) {
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = "连接名: $connectionName",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Color.LightGray
+                            )
+                        }
+                    }
+                }
                 Spacer(modifier = Modifier.height(48.dp))
             }
+            // ***************************************************************
         }
     }
 
@@ -364,7 +451,8 @@ fun FullDescriptionDialog(
     title: String,
     overview: String,
     onDismiss: () -> Unit
-) {
+)
+{
     Dialog(onDismissRequest = onDismiss) {
         Box(
             modifier = Modifier
