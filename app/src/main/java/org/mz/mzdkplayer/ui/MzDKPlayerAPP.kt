@@ -62,7 +62,6 @@ import org.mz.mzdkplayer.ui.screen.localfile.LocalFileScreen
 import org.mz.mzdkplayer.ui.screen.localfile.LocalFileTypeScreen
 import org.mz.mzdkplayer.ui.screen.httplink.HTTPLinkConScreen
 import org.mz.mzdkplayer.ui.screen.library.MovieLibraryScreen
-import org.mz.mzdkplayer.ui.screen.library.MovieLibraryScreen1
 import org.mz.mzdkplayer.ui.screen.library.TvLibraryScreen
 import org.mz.mzdkplayer.ui.screen.nfs.NFSConListScreen
 import org.mz.mzdkplayer.ui.screen.nfs.NFSConScreen
@@ -80,7 +79,7 @@ import org.mz.mzdkplayer.ui.screen.tv.TVSeriesDetailsScreen
 import org.mz.mzdkplayer.ui.screen.vm.MediaHistoryViewModel
 import org.mz.mzdkplayer.ui.screen.vm.MediaLibraryViewModel
 import org.mz.mzdkplayer.ui.screen.vm.SMBListViewModel
-import org.mz.mzdkplayer.ui.theme.MySideListItemColor
+import org.mz.mzdkplayer.ui.theme.mySideListItemColor
 
 import org.mz.mzdkplayer.ui.videoplayer.VideoPlayerScreen
 import java.net.URLDecoder
@@ -182,7 +181,7 @@ fun MzDKPlayerAPP(externalVideoUri: Uri?) {
                         items.forEachIndexed { index, item ->
                             val (text, icon) = item
                             ListItem(
-                                selected = false,
+                                selected = selectedIndex==index,
                                 modifier = if (index == len - 0 || index == len - 1) Modifier
                                     .widthIn(
                                         50.dp
@@ -255,7 +254,7 @@ fun MzDKPlayerAPP(externalVideoUri: Uri?) {
                                     )
                                     // Text(text, color = Color.White)
                                 },
-                                colors = MySideListItemColor(),
+                                colors = mySideListItemColor(),
                                 headlineContent = {},
                             )
                         }
@@ -287,7 +286,7 @@ fun MzDKPlayerAPP(externalVideoUri: Uri?) {
                         }
                         composable("MoviesPage") {
                             //页面路由对应的页面组件
-                            MovieLibraryScreen1(libraryViewModel,mainNavController)
+                            MovieLibraryScreen(libraryViewModel,mainNavController)
                         }
 
                         composable("TvLibraryPage") {

@@ -13,6 +13,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.media3.common.util.UnstableApi
+import org.mz.mzdkplayer.data.repository.SettingsRepository
 import org.mz.mzdkplayer.di.RepositoryProvider
 import org.mz.mzdkplayer.ui.MzDKPlayerAPP
 
@@ -95,6 +96,7 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         handleIntent(intent)
         RepositoryProvider.init(this)
+        SettingsRepository.init(this)
         setContent {
             var showSplash by remember { mutableStateOf(true) }
             if (showSplash) {

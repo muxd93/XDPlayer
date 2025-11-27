@@ -6,7 +6,6 @@ import androidx.tv.material3.ButtonColors
 import androidx.tv.material3.ButtonDefaults
 import androidx.tv.material3.ListItemColors
 import androidx.tv.material3.ListItemDefaults
-import androidx.tv.material3.LocalContentColor
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.TabColors
 import androidx.tv.material3.TabDefaults
@@ -69,19 +68,28 @@ fun MyFileListItemColor(): ListItemColors {
  * 主页侧边栏 ListItem 颜色
  */
 @Composable
-fun MySideListItemColor(): ListItemColors {
+fun mySideListItemColor(): ListItemColors {
     return ListItemDefaults.colors(
-        containerColor = Color(38, 38, 42, 255),
-        contentColor = Color(255, 248, 240), // 暖白色
-        selectedContainerColor = Color(255, 250, 245), // 米白色
-        selectedContentColor = Color(80, 70, 60), // 暖深灰
-        focusedSelectedContentColor = Color(80, 70, 60),
-        focusedSelectedContainerColor = Color(255, 250, 245),
-        focusedContainerColor = Color(255, 250, 245),
-        focusedContentColor = Color(80, 70, 60)
+        // --- 默认状态 (Default) ---
+        containerColor = Color(38, 38, 42, 255), // 默认背景深灰
+        contentColor = Color(255, 248, 240),      // 默认文字暖白
+
+        // --- 选中状态 (Selected) ---
+        // 选中但未获得焦点。使用浅暖灰背景，区分于默认深灰。
+        selectedContainerColor = Color(220, 220, 220, 255), // 浅暖灰
+        selectedContentColor = Color(80, 70, 60),             // 暖深灰文字
+
+        // --- 获得焦点状态 (Focused) ---
+        // 获得焦点但未选中。使用最亮的米白色背景，突出焦点。
+        focusedContainerColor = Color(255, 250, 245, 255), // 最亮米白
+        focusedContentColor = Color(80, 70, 60),             // 暖深灰文字
+
+        // --- 获得焦点且选中状态 (FocusedSelected) ---
+        // 获得焦点且选中。使用略微偏黄的颜色，强调是“被操作的选中项”。
+        focusedSelectedContainerColor = Color(255, 240, 200, 255), // 米黄色/淡金色，最高优先级
+        focusedSelectedContentColor = Color(80, 70, 60),             // 暖深灰文字
     )
 }
-
 @Composable
 fun MyTabColors(): TabColors {
     return TabDefaults.pillIndicatorTabColors(

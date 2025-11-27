@@ -34,7 +34,6 @@ fun MediaCard(
     Card(
         onClick = onClick,
         modifier = modifier
-            .padding(8.dp)
             .aspectRatio(2f / 3f), // 电影海报标准比例
         shape = CardDefaults.shape(shape = RoundedCornerShape(12.dp)),
         colors = CardDefaults.colors(
