@@ -7,6 +7,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.edit
 
 // 定义一个单例或者通过 Hilt 注入，这里用简单的单例模式
 object SettingsRepository {
@@ -19,6 +20,8 @@ object SettingsRepository {
 
     // --- 常规设置Keys ---
     private const val KEY_HIDE_DETAILS = "hide_details"
+
+    private const val KEY_HIDE_NETWORK_SPEED = "hide_network_speed"
 
     // --- 播放/视频/音频 Keys ---
     private const val KEY_AUDIO_LANG = "audio_lang" // ""=Auto, "zh", "en"
@@ -47,11 +50,14 @@ object SettingsRepository {
     var hideDetails: Boolean
         get() = prefs.getBoolean(KEY_HIDE_DETAILS, false)
         set(value) = prefs.edit().putBoolean(KEY_HIDE_DETAILS, value).apply()
+    var hideNetworkSpeed: Boolean
+        get() = prefs.getBoolean(KEY_HIDE_NETWORK_SPEED, true)
+        set(value) = prefs.edit { putBoolean(KEY_HIDE_NETWORK_SPEED, value) }
 
     // 播放 - 语言
     var audioLanguage: String // "" = Auto
         get() = prefs.getString(KEY_AUDIO_LANG, "") ?: ""
-        set(value) = prefs.edit().putString(KEY_AUDIO_LANG, value).apply()
+        set(value) = prefs.edit { putString(KEY_AUDIO_LANG, value) }
 
     var subtitleLanguage: String
         get() = prefs.getString(KEY_SUB_LANG, "") ?: ""

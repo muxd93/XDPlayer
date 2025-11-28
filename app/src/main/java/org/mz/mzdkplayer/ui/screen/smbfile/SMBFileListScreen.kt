@@ -85,6 +85,7 @@ import org.mz.mzdkplayer.ui.theme.myTTFColor
 import org.mz.mzdkplayer.ui.theme.MyFileListItemColor
 import org.mz.mzdkplayer.ui.screen.common.TvTextField
 import org.mz.mzdkplayer.ui.screen.vm.MovieViewModel
+import org.mz.mzdkplayer.ui.screen.vm.SettingsViewModel
 import java.net.URLDecoder
 import java.net.URLEncoder
 
@@ -93,7 +94,8 @@ import java.net.URLEncoder
 fun SMBFileListScreen(
     path: String?,
     navController: NavHostController,
-    connectionName: String = ""
+    connectionName: String = "",
+    settingsViewModel: SettingsViewModel =viewModel()
 ) {
     val context = LocalContext.current
     val viewModel: SMBConViewModel = viewModel()
@@ -109,6 +111,7 @@ fun SMBFileListScreen(
     }// 新增：获取MovieViewModel
     // 新增：电影信息状态
     val focusedMovie by movieViewModel.focusedMovie.collectAsState()
+    val settingsState by settingsViewModel.uiState.collectAsState()
 
     var seaText by remember { mutableStateOf("") }
     //  新增：过滤后的文件列表
@@ -332,7 +335,7 @@ fun SMBFileListScreen(
                                                                 "movieId:$mediaId"
                                                             )
                                                             // 先注释掉 观察movieId的值是否预期
-                                                            if (mediaId > 0 && focusedFileName == file.name) {
+                                                            if (mediaId > 0 && focusedFileName == file.name&&!settingsState.hideDetails) {
                                                                 val mediaInfoFN =
                                                                     MediaInfoExtractorFormFileName.extract(
                                                                         file.name

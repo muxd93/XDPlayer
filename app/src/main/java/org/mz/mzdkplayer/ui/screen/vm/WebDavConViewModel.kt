@@ -100,10 +100,10 @@ class WebDavConViewModel : ViewModel() {
                             ?: throw Exception("Sardine 未初始化或连接失败")
 
                         // 先去掉第一个元素（如果存在）
-                        val withoutFirst = if (resources.isNotEmpty()) resources.drop(1) else emptyList()
+                        //val withoutFirst = if (resources.isNotEmpty()) resources.drop(1) else emptyList()
 
                         // 再过滤掉 "." 和 ".."
-                        val filteredResources = withoutFirst.filter { it.name != "." && it.name != ".." }
+                        val filteredResources = resources.filter { it.name != "." && it.name != ".." }
 
                         // 构建 WebDavFileItem 列表
                         val webDavFileItemList = filteredResources.map { resource ->

@@ -85,6 +85,7 @@ import org.mz.mzdkplayer.tool.handleDPadKeyEvents
 import org.mz.mzdkplayer.ui.screen.common.LoadingScreen
 import org.mz.mzdkplayer.ui.screen.common.VAErrorScreen
 import org.mz.mzdkplayer.ui.screen.vm.MediaHistoryViewModel
+import org.mz.mzdkplayer.ui.screen.vm.SettingsViewModel
 import org.mz.mzdkplayer.ui.screen.vm.VideoPlayerStatus
 import org.mz.mzdkplayer.ui.screen.vm.VideoPlayerViewModel
 import org.mz.mzdkplayer.ui.videoplayer.components.AkDanmakuPlayer
@@ -124,7 +125,8 @@ fun VideoPlayerScreen(
     dataSourceType: String,
     fileName: String = "未知文件名",
     connectionName: String,
-    mediaHistoryViewModel: MediaHistoryViewModel
+    mediaHistoryViewModel: MediaHistoryViewModel,
+    settingsViewModel: SettingsViewModel = viewModel()
 ) {
     // 获取当前 Compose 上下文
     val context = LocalContext.current
@@ -171,6 +173,9 @@ fun VideoPlayerScreen(
 
     // 弹幕设置管理器
     val settingsManager = remember { DanmakuSettingsManager(context) }
+
+    // 从 SettingsViewModel 中获取字幕相关的状态
+    val settingsState by settingsViewModel.uiState.collectAsState()
 
     // 构建播放器 (设置媒体源等)
     BuilderMzPlayer(context, mediaUri, exoPlayer, dataSourceType)
@@ -383,8 +388,8 @@ fun VideoPlayerScreen(
 
     // 定义自定义字幕样式
     val customSubtitleStyle = TextStyle(
-        color = Color.White, // 字幕颜色为白色
-        fontSize = 22.sp,     // 字体大小
+        color = Color(settingsState.subColor), // 字幕颜色为白色
+        fontSize = settingsState.subFontSize.sp,     // 字体大小
         shadow = Shadow(
             color = Color.Black, // 黑色阴影
             offset = Offset(3f, 3f),
@@ -542,10 +547,11 @@ fun VideoPlayerScreen(
             SubtitleView(
                 cueGroup = currentCueGroup, // 传递当前字幕组
                 subtitleStyle = customSubtitleStyle, // 使用自定义字幕样式(只影响srt字幕)
-                modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 30.dp), // 底部居中对齐(只影响srt字幕)
+                modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = settingsState.subBottomPadding.dp), // 底部居中对齐(只影响srt字幕)
                 videoSizeDp = videoSizeDp,
-                backgroundColor = Color.Black.copy(alpha = 0.5f),// 背景色(只影响srt字幕)
-                exoPlayer = exoPlayer
+                backgroundColor = Color(settingsState.subBgColor),// 背景色(只影响srt字幕)
+                exoPlayer = exoPlayer,
+                forcePGSCenter = settingsState.forcePgsCenter
 
             )
         }
@@ -559,7 +565,7 @@ fun VideoPlayerScreen(
         )
 
         // 实时网速显示
-        if (isPlaying) {
+        if (isPlaying&&!settingsState.hideNetworkSpeed) {
             NetworkSpeedIndicator(
                 networkSpeed = networkSpeed, // 传递网络速度
                 modifier = Modifier

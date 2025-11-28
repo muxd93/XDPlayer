@@ -8,8 +8,11 @@ import android.provider.Settings
 import android.widget.Toast
 import androidx.annotation.RequiresApi
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.magnifier
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -25,6 +28,7 @@ import com.google.accompanist.permissions.isGranted
 import com.google.accompanist.permissions.rememberPermissionState
 import com.google.accompanist.permissions.shouldShowRationale
 import androidx.core.net.toUri
+import org.mz.mzdkplayer.R
 
 @OptIn(ExperimentalPermissionsApi::class)
 @Composable
@@ -51,12 +55,14 @@ fun FilePermissionScreen() {
                 Text("已获得所有文件访问权限", color = Color.White)
                 // 这里可以放置你的应用内容
             } else {
-                Text("需要所有文件访问权限")
-                Button(onClick = {
+                Text("需要所有文件访问权限",color = Color.White)
+                Spacer(modifier = Modifier.height(16.dp))
+                MyIconButton(
+                    text = "请求存储权限",
+                    icon = R.drawable.foldermanaged24dp,
+                    onClick = {
                     requestManageStoragePermission(context)
-                }) {
-                    Text("请求所有文件访问权限")
-                }
+                })
 
             }
         } else {
@@ -73,13 +79,15 @@ fun FilePermissionScreen() {
                     "需要存储权限来访问文件"
                 }
 
-                Text(textToShow)
-                Button(onClick = {
+                Text(textToShow, color = Color.White)
+                Spacer(modifier = Modifier.height(16.dp))
+                MyIconButton(
+                    text = "请求存储权限",
+                    icon = R.drawable.foldermanaged24dp,
+                    onClick = {
                     readPermissionState.launchPermissionRequest()
                     writePermissionState.launchPermissionRequest()
-                }) {
-                    Text("请求存储权限")
-                }
+                })
             }
         }
     }

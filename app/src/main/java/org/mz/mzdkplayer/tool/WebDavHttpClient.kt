@@ -25,7 +25,7 @@ class WebDavHttpClient {
         private fun createRestrictedTrustClient(): OkHttpClient {
             return try {
                 val trustManager = createRestrictedTrustManager()
-                val sslContext = SSLContext.getInstance("TLS")
+                val sslContext = SSLContext.getInstance("SSL")
                 sslContext.init(null, arrayOf<TrustManager>(trustManager), SecureRandom())
 
                 OkHttpClient.Builder()
@@ -115,6 +115,8 @@ class WebDavHttpClient {
                 }
                 // 本地地址
                 hostname == "localhost" || hostname == "127.0.0.1" -> true
+
+                hostname =="openapi.alipan.com" ->true
                 // 其他情况一律拒绝
                 else -> false
             }

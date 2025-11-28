@@ -10,7 +10,9 @@ import androidx.media3.datasource.DataSource
 import androidx.media3.datasource.DataSourceException
 import androidx.media3.datasource.DataSpec
 import com.thegrizzlylabs.sardineandroid.impl.OkHttpSardine
+import okhttp3.Credentials
 import okhttp3.OkHttpClient
+import okhttp3.Request
 import java.io.IOException
 import java.io.InputStream
 import java.security.SecureRandom
@@ -50,6 +52,9 @@ class WebDavDataSource : BaseDataSource(/* isNetwork= */ true) {
     private var numReads = 0
     private var totalReadTime = 0L
     private  var lastLogTime =0L
+
+    private var myUsername=""
+    private var myPassword = ""
     // --- 配置参数 ---
     companion object {
         private const val TAG = "WebDavDataSource"
@@ -83,7 +88,7 @@ class WebDavDataSource : BaseDataSource(/* isNetwork= */ true) {
             establishConnection(dataSpec)
 
             // 2. 获取文件信息并验证范围
-            val fileLength = getFileLength()
+            val fileLength = getFileLength(myUsername,myPassword)
             val startPosition = dataSpec.position
 
             if (startPosition !in 0..fileLength) {
@@ -164,6 +169,9 @@ class WebDavDataSource : BaseDataSource(/* isNetwork= */ true) {
         val (username, password) = uri.userInfo?.split(":")?.let {
             if (it.size == 2) Pair(it[0], it[1]) else Pair("", "")
         } ?: Pair("", "")
+        myUsername = username
+        myPassword = password
+
 
         try {
             // 初始化 Sardine 客户端
@@ -180,6 +188,7 @@ class WebDavDataSource : BaseDataSource(/* isNetwork= */ true) {
             validateConnection(cleanUriString)
 
         } catch (e: Exception) {
+            Log.d(TAG,"建立 WebDAV 连接时出错: ${e.message}")
             throw IOException("建立 WebDAV 连接时出错: ${e.message}", e)
         }
     }
@@ -199,31 +208,76 @@ class WebDavDataSource : BaseDataSource(/* isNetwork= */ true) {
     // ... (validateConnection 方法保持不变) ...
     @Throws(IOException::class)
     private fun validateConnection(uri: String) {
-        val davResources = sardine?.list(uri)
-        if (davResources.isNullOrEmpty()) {
-            throw IOException("无法获取文件信息或文件不存在: $uri")
-        }
+//        val davResources = sardine?.get(uri)
+//        Log.d(TAG, "dav"+davResources?.size.toString())
+//        if (davResources.isNullOrEmpty()) {
+//            Log.d(TAG, "无法获取文件信息或文件不存在")
+//            throw IOException("无法获取文件信息或文件不存在: $uri")
+//        }
     }
-
     /**
      * 获取文件长度，包含错误处理
      */
+//    @Throws(IOException::class)
+//    private fun getFileLength(): Long {
+//        return try {
+//            val cleanUri = buildCleanUri(dataSpec?.uri!!)
+//            val davResources = sardine?.list(cleanUri)
+//                ?: throw IOException("无法获取文件信息")
+//
+//            if (davResources.isEmpty()) {
+//                throw IOException("文件不存在")
+//            }
+//
+//            davResources[0].contentLength
+//        } catch (e: Exception) {
+//            throw IOException("获取文件大小时出错: ${e.message}", e)
+//        }
+//    }
     @Throws(IOException::class)
-    private fun getFileLength(): Long {
-        return try {
+    private fun getFileLength(username: String, password: String): Long {
+        try {
             val cleanUri = buildCleanUri(dataSpec?.uri!!)
-            val davResources = sardine?.list(cleanUri)
-                ?: throw IOException("无法获取文件信息")
 
-            if (davResources.isEmpty()) {
-                throw IOException("文件不存在")
+            // 1. 准备鉴权信息 (Sardine 里的账号密码要拿过来用)
+
+            val credential = Credentials.basic(username, password)
+
+            // 2. 构建 HEAD 请求
+            val request = Request.Builder()
+                .url(cleanUri)
+                .header("Authorization", credential) // 添加鉴权头
+                .head() // 关键：只请求头信息，不下载 body
+                .build()
+
+            // 3. 执行请求
+            // 注意：这里用 execute() 是同步阻塞的，这符合你原本函数的写法
+            // use 扩展方法会自动关闭 response，防止内存泄漏
+            webDavClient.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) {
+                    // 如果是 404 就是文件不存在，401 是密码错，400 是请求错...
+                    if (response.code == 404) {
+                        throw IOException("文件不存在 (404)")
+                    }
+                    throw IOException("请求失败: ${response.code} ${response.message}")
+                }
+
+                // 4. 获取长度
+                val lengthStr = response.header("Content-Length")
+                // 有些服务器可能不返 Content-Length，或者返回 chunked 传输，需要兜底
+                val length = lengthStr?.toLongOrNull() ?: -1L
+
+                if (length < 0) {
+                    throw IOException("服务器未返回有效的文件大小")
+                }
+
+                return length
             }
-
-            davResources[0].contentLength
         } catch (e: Exception) {
-            throw IOException("获取文件大小时出错: ${e.message}", e)
+            throw IOException("OkHttp 获取文件大小出错: ${e.message}", e)
         }
     }
+
 
     /**
      * 核心修改：直接从 open() 中获取的长连接流中读取数据。

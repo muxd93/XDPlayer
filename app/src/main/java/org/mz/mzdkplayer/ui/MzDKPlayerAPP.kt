@@ -79,6 +79,7 @@ import org.mz.mzdkplayer.ui.screen.tv.TVSeriesDetailsScreen
 import org.mz.mzdkplayer.ui.screen.vm.MediaHistoryViewModel
 import org.mz.mzdkplayer.ui.screen.vm.MediaLibraryViewModel
 import org.mz.mzdkplayer.ui.screen.vm.SMBListViewModel
+import org.mz.mzdkplayer.ui.screen.vm.SettingsViewModel
 import org.mz.mzdkplayer.ui.theme.mySideListItemColor
 
 import org.mz.mzdkplayer.ui.videoplayer.VideoPlayerScreen
@@ -151,6 +152,7 @@ fun MzDKPlayerAPP(externalVideoUri: Uri?) {
     }
 
     val mediaHistoryViewModel: MediaHistoryViewModel = viewModelWithFactory {RepositoryProvider.createMediaHistoryViewModel()  }
+    val settingsVM: SettingsViewModel = viewModel()
     NavHost(
         navController = mainNavController,
         startDestination = "MainPage",
@@ -278,7 +280,7 @@ fun MzDKPlayerAPP(externalVideoUri: Uri?) {
                         }
                         composable("SettingsPage") {
                             //页面路由对应的页面组件
-                            SettingsScreen(mainNavController)
+                            SettingsScreen(mainNavController,settingsVM)
                         }
                         composable("HistoryPage") {
                             //页面路由对应的页面组件
@@ -286,12 +288,12 @@ fun MzDKPlayerAPP(externalVideoUri: Uri?) {
                         }
                         composable("MoviesPage") {
                             //页面路由对应的页面组件
-                            MovieLibraryScreen(libraryViewModel,mainNavController)
+                            MovieLibraryScreen(libraryViewModel,mainNavController,homeNavController,settingsVM)
                         }
 
                         composable("TvLibraryPage") {
                             //页面路由对应的页面组件
-                            TvLibraryScreen(libraryViewModel,mainNavController)
+                            TvLibraryScreen(libraryViewModel,mainNavController,homeNavController,settingsVM)
                         }
                         composable("SearchPage") {
                             //页面路由对应的页面组件
@@ -329,7 +331,8 @@ fun MzDKPlayerAPP(externalVideoUri: Uri?) {
                     dataSourceType,
                     URLDecoder.decode(fileName, "UTF-8"),
                     URLDecoder.decode(connectionName, "UTF-8"),
-                    mediaHistoryViewModel
+                    mediaHistoryViewModel,
+                    settingsVM
                 )
             }
         }

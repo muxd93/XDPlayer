@@ -9,6 +9,7 @@ import org.mz.mzdkplayer.data.repository.SettingsRepository
 // 简单的数据类用于 UI 状态
 data class SettingsUiState(
     val hideDetails: Boolean = false,
+    val hideNetworkSpeed: Boolean = true,
     val audioLang: String = "",
     val subLang: String = "",
     val enableTunneling: Boolean = true,
@@ -40,6 +41,7 @@ class SettingsViewModel : ViewModel() {
         _uiState.update {
             SettingsUiState(
                 hideDetails = repo.hideDetails,
+                hideNetworkSpeed = repo.hideNetworkSpeed,
                 audioLang = repo.audioLanguage,
                 subLang = repo.subtitleLanguage,
                 enableTunneling = repo.enableTunneling,
@@ -61,6 +63,7 @@ class SettingsViewModel : ViewModel() {
 
     // 通用的更新方法
     fun toggleHideDetails(v: Boolean) { repo.hideDetails = v; refreshState() }
+    fun toggleHideNetWorkSpeed(v: Boolean) { repo.hideNetworkSpeed = v; refreshState() }
     fun setAudioLanguage(v: String) { repo.audioLanguage = v; refreshState() }
     fun setSubLanguage(v: String) { repo.subtitleLanguage = v; refreshState() }
     fun toggleTunneling(v: Boolean) { repo.enableTunneling = v; refreshState() }
