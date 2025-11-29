@@ -23,6 +23,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.media3.common.C
 import androidx.media3.common.TrackSelectionOverride
 import androidx.media3.common.Tracks
 import androidx.media3.common.util.UnstableApi
@@ -32,7 +33,7 @@ import androidx.tv.material3.ListItem
 import androidx.tv.material3.ListItemDefaults
 import androidx.tv.material3.Text
 import kotlinx.coroutines.launch
-import org.mz.mzdkplayer.R
+import org.mz.mzdkplayer.R // 确保 R.drawable.hdr_1 和 R.drawable.dolby_vision_seeklogo 等存在
 import org.mz.mzdkplayer.tool.focusOnInitialVisibility
 import java.util.Locale
 
@@ -46,13 +47,9 @@ fun VideoTrackPanel(
     lists: MutableList<Tracks.Group>,
     exoPlayer: ExoPlayer
 ) {
+    // ... (状态和修饰符保持不变)
     val focusRequester = remember { FocusRequester() }
     val isVis = remember { mutableStateOf(false) }
-    var videoCode = ""
-    var videoHeight = 0
-    var videoFrame = 0f
-    var videoBitmap = 0
-    var videoId: String? = "120"
     val coroutineScope = rememberCoroutineScope()
     val listState = rememberLazyListState()
 
@@ -60,7 +57,6 @@ fun VideoTrackPanel(
         modifier = Modifier
             .widthIn(200.dp, 500.dp)
             .heightIn(200.dp, 500.dp),
-
         state = listState
     ) {
         if (lists.isEmpty()) {
@@ -80,16 +76,54 @@ fun VideoTrackPanel(
                 }
             }
         } else {
-            //LazyColumn滚到到当前选择位置
+            // LazyColumn滚到到当前选择位置
             coroutineScope.launch {
                 listState.animateScrollToItem(index = selectedIndex)
             }
             items(lists.size) { index ->
-                videoCode = lists[index].getTrackFormat(0).codecs.toString()
-                videoHeight = lists[index].getTrackFormat(0).height
-                videoFrame = lists[index].getTrackFormat(0).frameRate
-                videoId = lists[index].getTrackFormat(0).id
-                videoBitmap = lists[index].getTrackFormat(0).bitrate
+                val format = lists[index].getTrackFormat(0)
+                val videoCode = format.codecs.orEmpty()
+                val videoHeight = format.height
+                val videoBitmap = format.bitrate
+
+
+                // *** 新增：安全地获取 ColorInfo 字段 ***
+                val colorInfo = format.colorInfo
+
+                // 使用 .getOrDefault(C.COLOR_TRANSFER_UNSET) 替代，但由于 UNSET 未解析，
+                // 我们直接从 colorInfo 检查。如果 colorInfo 为 null，我们视为 UNSET。
+                // 否则，取其内部值。
+                val colorTransfer = colorInfo?.colorTransfer ?: C.INDEX_UNSET // C.INDEX_UNSET通常是-1
+                val colorSpace = colorInfo?.colorSpace ?: C.INDEX_UNSET
+
+
+                // --- 轨道信息判断 ---
+                val isDolbyVision = videoCode.contains("dvh", ignoreCase = true)
+
+                // 使用 C.COLOR_TRANSFER_ST2084 代替 C.COLOR_TRANSFER_PQ
+                // ST2084 是 PQ 曲线的官方标准
+                val isHdr10 = (colorTransfer == C.COLOR_TRANSFER_ST2084 ||
+                        colorTransfer == C.COLOR_TRANSFER_HLG) &&
+                        colorSpace == C.COLOR_SPACE_BT2020 &&
+                        !isDolbyVision // 排除 DV
+
+                // 确定视频编码类型
+                val isHevc = videoCode.contains("hev", ignoreCase = true)
+                val isAvc = videoCode.contains("avc", ignoreCase = true)
+                val isAv1 = videoCode.contains("av0", ignoreCase = true)
+
+                // 构造轨道名称前缀
+                val qualityPrefix = when {
+                    isDolbyVision -> "杜比视界"
+                    isHdr10 -> "HDR" // 识别为 HDR10/HLG (非DV)
+                    // 使用垂直分辨率（videoHeight）来判断质量等级
+                    videoHeight >= 2160 -> "4K/UHD" // 标准 4K/UHD 高度为 2160P
+                    videoHeight >= 1440 -> "2K/1440P" // 增加 1440P 等级
+                    videoHeight >= 1080 -> "1080P"  // 标准 1080P 高度
+                    videoHeight >= 720 -> "720P"   // 标准 720P 高度
+                    else -> "标清"
+                }
+
                 ListItem(
                     modifier = if (index == selectedIndex /*选中的获取焦点*/) {
                         Modifier
@@ -116,202 +150,70 @@ fun VideoTrackPanel(
                         focusedSelectedContainerColor = Color(255, 255, 255),
                         focusedContainerColor = Color(255, 255, 255),
                         focusedContentColor = Color(0, 0, 0)
-
-
                     ),
-                    //scale = ListItemScale(1.03f,1.03f,1.03f,1.03f,1.03f,1.03f,1.03f,1.03f),
                     headlineContent = {
-                        if (videoCode != "" && videoId != null) {
-                            if (!videoCode.contains("dvh", true) && "127" == videoId
-                            ) {
-                                Text(
-                                    "8K 超高清 ${videoHeight}P ${
-                                        String.format(
-                                            Locale.CHINA,
-                                            "%.1f",
-                                            videoBitmap / 1000.0 / 1000.0
-                                        )
-                                    }Mbps"
-                                )
-                            } else if (videoCode.contains("dvh", true) && "126" == videoId) {
-                                Text(
-                                    "杜比视界 ${videoHeight}P ${
-                                        String.format(
-                                            Locale.CHINA,
-                                            "%.1f",
-                                            videoBitmap / 1000.0 / 1000.0
-                                        )
-                                    }Mbps"
-                                )
-                            } else if (!videoCode.contains("dvh", true) && "125" == videoId
-                            ) {
-                                Text(
-                                    "HDR ${videoHeight}P ${
-                                        String.format(
-                                            Locale.CHINA,
-                                            "%.1f",
-                                            videoBitmap / 1000.0 / 1000.0
-                                        )
-                                    }Mbps"
-                                )
-                            } else if (!videoCode.contains("dvh", true) && "120" == videoId
-                            ) {
-                                Text(
-                                    "4K 超高清 ${videoHeight}P ${
-                                        String.format(
-                                            Locale.CHINA,
-                                            "%.1f",
-                                            videoBitmap / 1000.0 / 1000.0
-                                        )
-                                    }Mbps"
-                                )
-                            } else if (!videoCode.contains("dvh", true) && "116" == videoId
-                            ) {
-                                Text(
-                                    "1080P60 高帧率 ${videoHeight}P ${
-                                        String.format(
-                                            Locale.CHINA,
-                                            "%.1f",
-                                            videoBitmap / 1000.0 / 1000.0
-                                        )
-                                    }Mbps"
-                                )
-                            } else if (!videoCode.contains("dvh", true) && "112" == videoId
-                            ) {
-                                Text(
-                                    "1080P+ 高码率 ${videoHeight}P ${
-                                        String.format(
-                                            Locale.CHINA,
-                                            "%.1f",
-                                            videoBitmap / 1000.0 / 1000.0
-                                        )
-                                    }Mbps"
-                                )
-                            } else if (!videoCode.contains("dvh", true) && "100" == videoId
-                            ) {
-                                Text(
-                                    "智能修复 ${videoHeight}P ${
-                                        String.format(
-                                            Locale.CHINA,
-                                            "%.1f",
-                                            videoBitmap / 1000.0 / 1000.0
-                                        )
-                                    }Mbps"
-                                )
-                            } else if (!videoCode.contains("dvh", true) && "80" == videoId
-                            ) {
-                                Text(
-                                    "1080P 高清 ${videoHeight}P ${
-                                        String.format(
-                                            Locale.CHINA,
-                                            "%.1f",
-                                            videoBitmap / 1000.0 / 1000.0
-                                        )
-                                    }Mbps"
-                                )
-                            } else if (!videoCode.contains("dvh", true) && "74" == videoId
-                            ) {
-                                Text(
-                                    "720P60 高帧率 ${videoHeight}P ${
-                                        String.format(
-                                            Locale.CHINA,
-                                            "%.1f",
-                                            videoBitmap / 1000.0 / 1000.0
-                                        )
-                                    }Mbps"
-                                )
-                            } else if (!videoCode.contains("dvh", true) && "64" == videoId
-                            ) {
-                                Text(
-                                    "720P 高清 ${videoHeight}P ${
-                                        String.format(
-                                            Locale.CHINA,
-                                            "%.1f",
-                                            videoBitmap / 1000.0 / 1000.0
-                                        )
-                                    }Mbps"
-                                )
-                            } else if (!videoCode.contains("dvh", true) && "32" == videoId
-                            ) {
-                                Text(
-                                    "480P 清晰 ${videoHeight}P ${
-                                        String.format(
-                                            Locale.CHINA,
-                                            "%.1f",
-                                            videoBitmap / 1000.0 / 1000.0
-                                        )
-                                    }Mbps"
-                                )
-                            } else if (!videoCode.contains("dvh", true) && "16" == videoId
-                            ) {
-                                Text(
-                                    "360P 流畅 ${videoHeight}P ${
-                                        String.format(
-                                            Locale.CHINA,
-                                            "%.1f",
-                                            videoBitmap / 1000.0 / 1000.0
-                                        )
-                                    }Mbps"
-                                )
-                            } else {
-                                Text(
-                                    " ${videoHeight}P ${
-                                        String.format(
-                                            Locale.CHINA,
-                                            "%.1f",
-                                            videoBitmap / 1000.0 / 1000.0
-                                        )
-                                    }Mbps"
-                                )
-                            }
-                        }
+                        Text(
+                            "$qualityPrefix ${videoHeight}P " +
+                                    "${String.format(Locale.getDefault(), "%.1f", videoBitmap / 1000.0 / 1000.0)}Mbps"
+                        )
                     },
                     leadingContent = if (selectedIndex == index) {
                         {
                             Icon(
                                 Icons.Filled.Check,
-                                contentDescription = "Localized description",
+                                contentDescription = "已选择",
                             )
                         }
                     } else null,
                     trailingContent = {
+                        // 1. 显示 DV 图标
+                        if (isDolbyVision) {
+                            Icon(
+                                painterResource(id = R.drawable.dolby_vision_seeklogo),
+                                contentDescription = "杜比视界",
+                                modifier = Modifier.height(38.dp).width(38.dp)
+                            )
+                        }
+                        // 2. 显示 HDR 图标 (如果不是 DV)
+                        else if (isHdr10) {
+                            Icon(
+                                painterResource(id = R.drawable.hdr_1),
+                                contentDescription = "HDR",
+                                modifier = Modifier.height(38.dp).width(38.dp)
+                            )
+                        }
 
-                        if (videoCode != "") {
-                            if (videoCode.contains("dvh", true)) {
-                                Icon(
-                                    painterResource(id = R.drawable.dolby_vision_seeklogo),
-                                    contentDescription = "Localized description",
-                                )
-                            }
-                            if (videoCode.contains("hev", true)) {
-                                Icon(
-                                    painterResource(id = R.drawable.h265),
-                                    contentDescription = "Localized description",
-                                )
-                            }
-                            if (videoCode.contains("avc", true)) {
-                                Icon(
-                                    painterResource(id = R.drawable.h264),
-                                    contentDescription = "Localized description",
-                                )
-                            }
-                            if (videoCode.contains("av0", true)) {
-                                Icon(
-                                    painterResource(id = R.drawable.av1),
-                                    contentDescription = "Localized description",
-                                )
-                            }
+                        // 3. 显示编码格式图标
+                        if (isHevc) {
+                            Icon(
+                                painterResource(id = R.drawable.h265),
+                                contentDescription = "H.265/HEVC",
+                                modifier = Modifier.height(23.dp).width(46.dp)
+                            )
+                        } else if (isAvc) {
+                            Icon(
+                                painterResource(id = R.drawable.h264),
+                                contentDescription = "H.264/AVC",
+                                modifier = Modifier.height(23.dp).width(46.dp)
+
+                            )
+                        } else if (isAv1) {
+                            Icon(
+                                painterResource(id = R.drawable.av1),
+                                contentDescription = "AV1",
+                                modifier = Modifier.height(23.dp).width(46.dp)
+                            )
                         }
                     },
                     onClick = {
-                        onSelectedIndexChange(index);
+                        onSelectedIndexChange(index)
                         exoPlayer.trackSelectionParameters =
                             exoPlayer.trackSelectionParameters.buildUpon().setOverrideForType(
                                 TrackSelectionOverride(
                                     lists[index].mediaTrackGroup,
                                     0
                                 )
-                            ).build();
+                            ).build()
                     }
                 )
             }
