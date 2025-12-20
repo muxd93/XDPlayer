@@ -8,13 +8,16 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 import kotlin.math.hypot
+import kotlin.math.ln
 import kotlin.math.log10
 
 
@@ -23,130 +26,84 @@ fun AudioVisualizer(
     audioSessionId: Int,
     isPlaying: Boolean,
     modifier: Modifier = Modifier,
-    barCount: Int = 30,
+    barCount: Int = 50,
     color: Color = Color.Cyan
 ) {
-    // 1. 获取 Composable 作用域，用于安全地切换到主线程更新状态
-    val coroutineScope = rememberCoroutineScope()
-
-    // 检查输入参数
-    LaunchedEffect(audioSessionId, isPlaying) {
-        Log.d("VisDebug", "Composable Update -> ID: $audioSessionId, isPlaying: $isPlaying")
-    }
-
-    var fftBytes by remember { mutableStateOf(ByteArray(0)) }
-    // ⭐ 计数器状态依然保留，但这次只在主线程更新，用于确保重绘
-    var dataUpdateTick by remember { mutableIntStateOf(0) }
+    var tick by remember { mutableLongStateOf(0L) }
+    val fftData = remember { mutableStateOf(ByteArray(0)) }
+    val lastHeights = remember { FloatArray(barCount) }
 
     DisposableEffect(audioSessionId) {
-        if (audioSessionId == 0) {
-            Log.w("VisDebug", "❌ Abort Init: audioSessionId is 0. Waiting for real ID...")
-            return@DisposableEffect onDispose { }
-        }
-
-        Log.d("VisDebug", "🚀 Starting Visualizer init for ID: $audioSessionId")
-
-        var visualizer: Visualizer? = null
-        try {
-            visualizer = Visualizer(audioSessionId)
-            if (!visualizer.enabled) {
-                Log.d("VisDebug", "Visualizer created but not enabled yet.")
-            }
-
-            visualizer.apply {
-                captureSize = Visualizer.getCaptureSizeRange()[1]
-                val desiredRate = Visualizer.getMaxCaptureRate()
-
-                Log.d("VisDebug", "Device Max Rate: $desiredRate mHz")
-
-                setDataCaptureListener(object : Visualizer.OnDataCaptureListener {
-                    override fun onWaveFormDataCapture(v: Visualizer?, waveform: ByteArray?, samplingRate: Int) {}
-
-                    var logCounter = 0
-                    override fun onFftDataCapture(v: Visualizer?, fft: ByteArray?, samplingRate: Int) {
-
-                        if (fft != null) {
-                            // 1. 在 Coroutine Scope 内更新状态，保证在主线程执行，触发重绘
-                            coroutineScope.launch {
-                                fftBytes = fft
-                                dataUpdateTick = (dataUpdateTick + 1) % 100000
-                            }
-
-                            // 2. 调整日志频率，现在每 10 次回调打印一次，更细致地观察速率
-                            if (logCounter++ % 10 == 0) {
-                                val hasData = fft.any { it != 0.toByte() }
-                                // 注意：此日志在后台线程打印
-                                Log.d("VisDebug", "📡 Data received (BGT). Has Non-Zero Data: $hasData")
-                            }
-                        } else {
-                            if (logCounter++ % 60 == 0) Log.w("VisDebug", "⚠️ Received NULL FFT data")
-                        }
+        if (audioSessionId <= 0) return@DisposableEffect onDispose {}
+        val visualizer = Visualizer(audioSessionId).apply {
+            // 减小 captureSize 有助于提高刷新灵敏度，尝试用 512 或 1024
+            captureSize = 512
+            setDataCaptureListener(object : Visualizer.OnDataCaptureListener {
+                override fun onWaveFormDataCapture(v: Visualizer?, w: ByteArray?, s: Int) {}
+                override fun onFftDataCapture(v: Visualizer?, fft: ByteArray?, s: Int) {
+                    if (fft != null && isPlaying) {
+                        fftData.value = fft
+                        tick = System.nanoTime()
                     }
-                }, desiredRate , false, true) // 使用 desiredRate
-
-                enabled = true
-                Log.d("VisDebug", "✅ Visualizer enabled successfully")
-            }
-        } catch (e: Exception) {
-            Log.e("VisDebug", "🔥 FATAL ERROR initializing visualizer: ${e.message}", e)
+                }
+            }, Visualizer.getMaxCaptureRate() / 2, false, true)
+            enabled = true
         }
-
         onDispose {
-            Log.d("VisDebug", "🗑️ Releasing Visualizer")
-            visualizer?.enabled = false
-            visualizer?.release()
-            visualizer = null
+            visualizer.enabled = false
+            visualizer.release()
         }
     }
 
-    // 4. 检查绘制条件，依赖 dataUpdateTick 来确保每次数据更新都重绘
-    if (isPlaying && fftBytes.isNotEmpty() && dataUpdateTick >= 0) {
-        Canvas(modifier = modifier) {
-            if (size.width <= 0 || size.height <= 0) {
-                Log.e("VisDebug", "⚠️ Canvas size is INVALID: ${size.width} x ${size.height}")
-                return@Canvas
+    Canvas(modifier = modifier) {
+        val refresh = tick
+        val data = fftData.value
+        if (data.isEmpty()) return@Canvas
+
+        val gap = 2.dp.toPx()
+        val barWidth = (size.width - (barCount - 1) * gap) / barCount
+        val cornerRadius = CornerRadius(barWidth / 2, barWidth / 2)
+
+        // FFT 数据长度通常为 captureSize
+        val n = data.size / 2
+
+        for (i in 0 until barCount) {
+            // 1. 改进采样索引：Android FFT 前几位是极低频，跳过第0位(直流分量)
+            // 使用幂函数曲线采样，让低频占比例缩小，高频占比例增大
+            val fraction = i.toFloat() / barCount
+            val index = (Math.pow(fraction.toDouble(), 1.5) * (n - 2)).toInt().coerceIn(1, n - 1)
+
+            val r = data[index * 2].toFloat()
+            val img = data[index * 2 + 1].toFloat()
+            val magnitude = hypot(r, img)
+
+            // 2. 核心改进：指数级增益补偿 (Boost)
+            // i 越往右（高频），补偿系数越大。Math.pow 让右侧补偿呈指数上升
+            val multiplier = 1.0f + Math.pow(fraction.toDouble(), 2.0).toFloat() * 15f
+
+            // 3. 计算目标高度，并加入一个微小的随机基础高度，防止死掉
+            var targetHeight = (magnitude * multiplier * (size.height / 100f))
+
+            // 如果是在播放中，给个灵动的最小高度
+            val minHeight = if (isPlaying) 8f else 0f
+            targetHeight = targetHeight.coerceIn(minHeight, size.height)
+
+            // 4. 平滑算法：上升快，下降慢
+            val currentHeight = if (targetHeight >= lastHeights[i]) {
+                // 上升：取目标值和旧值的中值，减少跳变感
+                (targetHeight + lastHeights[i]) / 2f
+            } else {
+                // 下降：模拟重力下落
+                lastHeights[i] * 0.82f
             }
+            lastHeights[i] = currentHeight
 
-            val widthPerBar = size.width / barCount
-            val gap = 4.dp.toPx()
-            val barWidth = widthPerBar - gap
-            val n = fftBytes.size
-            val step = (n / 2) / barCount
-
-            for (i in 0 until barCount) {
-                val index = (i * step) * 2
-                if (index + 1 >= n) break
-
-                val r = fftBytes[index].toFloat()
-                val img = fftBytes[index + 1].toFloat()
-
-                // 1. 计算振幅，并添加偏置 (Bias) 消除底噪带来的全零静止
-                val magnitude = hypot(r, img)
-                val magnitudeWithBias = magnitude + 10f
-
-                // 2. 转换为分贝值。注意使用 log10(x) 的输入 x >= 1
-                // dbValue = 10 * log10(magnitude^2)
-                val dbValue = 10 * log10(magnitudeWithBias * magnitudeWithBias)
-
-                // 3. 动态计算高度，使用一个较大的缩放因子（例如 15），让频谱更灵敏
-                val barHeight = (dbValue * 15 * size.height / 200)
-                    .coerceIn(0.0F, size.height.toFloat())
-                    .toFloat()
-
-                // ⚠️ 调试成功后请移除此行日志，因为它会严重影响性能
-                 Log.d("VisDebug",barHeight.toString())
-
-                drawLine(
-                    brush = SolidColor(color),
-                    start = Offset(x = i * widthPerBar + gap / 2, y = size.height),
-                    end = Offset(x = i * widthPerBar + gap / 2, y = size.height - barHeight),
-                    strokeWidth = barWidth
-                )
-            }
+            drawRoundRect(
+                color = color,
+                topLeft = Offset(i * (barWidth + gap), size.height - currentHeight),
+                size = Size(barWidth, currentHeight),
+                cornerRadius = cornerRadius
+            )
         }
-    } else {
-        // 记录为什么不显示
-        if (!isPlaying) Log.v("VisDebug", "🙈 Hidden: Not playing")
-        else if (fftBytes.isEmpty()) Log.v("VisDebug", "🙈 Hidden: No FFT data yet")
     }
 }

@@ -59,7 +59,7 @@ fun WebDavConScreen() {
     var currentPath by remember { mutableStateOf("") }
 
     // 用户输入状态 - baseUrl 现在表示完整的路径
-    var baseUrl by remember { mutableStateOf("") }
+    var baseUrl by remember { mutableStateOf("http://") }
     var username by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var aliasName by remember { mutableStateOf("") }
@@ -105,7 +105,7 @@ fun WebDavConScreen() {
                 value = baseUrl,
                 onValueChange = { baseUrl = it },
                 modifier = Modifier.fillMaxWidth(),
-                placeholder = "完整 WebDAV 路径 (e.g., https://192.168.1.4:5006/movies)",
+                placeholder = " WebDAV 路径 (e.g., http://192.168.1.4:5006/) 局域网仅支持http",
                 colors = myTTFColor(),
                 textStyle = TextStyle(color = Color.White),
             )

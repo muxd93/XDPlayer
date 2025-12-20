@@ -147,7 +147,7 @@ class WebDavDataSource : BaseDataSource(/* isNetwork= */ true) {
 
         // 如果实例不存在，或者需要重置（OkHttpSardine 通常支持动态 setCredentials，所以复用实例即可）
         if (sharedSardine == null) {
-            sharedSardine = OkHttpSardine(sharedOkHttpClient)
+            sharedSardine = OkHttpSardine()
         }
 
         // 每次 open 都更新一下凭证，防止同一个 Sardine 实例用于不同账号

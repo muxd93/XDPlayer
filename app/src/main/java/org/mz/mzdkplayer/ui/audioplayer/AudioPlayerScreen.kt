@@ -440,20 +440,20 @@ fun AudioPlayerScreen(
         // --- 新增：频谱显示 ---
         // 把它放在最底层（Box的第一个子元素），这样会被文字覆盖，当作动态背景
         // 或者你可以放在 Row 下面，如果你想让它显示在特定区域
-//        if (isPlaying&& currentAudioSessionId > 0) {
-//
-//            AudioVisualizer(
-//                audioSessionId = currentAudioSessionId,
-//                isPlaying = isPlaying,
-//                modifier = Modifier
-//                    .align(Alignment.BottomCenter) // 对齐到底部
-//                    .fillMaxWidth()
-//                    .height(200.dp) // 高度限制
-//                    .padding(bottom = 120.dp) // 避开底部的控制栏
-//                    .alpha(0.3f), // 设置透明度，不要太抢眼
-//                color = MaterialTheme.colorScheme.primary // 使用主题色
-//            )
-//        }
+        if (isPlaying&& currentAudioSessionId > 0) {
+
+            AudioVisualizer(
+                audioSessionId = currentAudioSessionId,
+                isPlaying = isPlaying,
+                modifier = Modifier
+                    .align(Alignment.BottomCenter) // 对齐到底部
+                    .fillMaxWidth()
+                    .height(200.dp) // 高度限制
+                    .padding(bottom = 120.dp) // 避开底部的控制栏
+                    .alpha(0.3f), // 设置透明度，不要太抢眼
+               // color = MaterialTheme.colorScheme.primary // 使用主题色
+            )
+        }
 
         Row(
             modifier = Modifier

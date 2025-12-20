@@ -43,7 +43,7 @@ class WebDavConViewModel : ViewModel() {
     private var sardine: OkHttpSardine? = null
     private var baseUrl: String = "" // 存储基础认证URL
     private val webDavClient by  lazy{
-        WebDavHttpClient.restrictedTrustOkHttpClient
+        restrictedTrustOkHttpClient
     }
     private val mutex = Mutex()
 
@@ -61,7 +61,7 @@ class WebDavConViewModel : ViewModel() {
                     withContext(Dispatchers.IO) {
 
 
-                        sardine = OkHttpSardine(webDavClient)
+                        sardine = OkHttpSardine()
                         sardine?.setCredentials(username, password)
 
                         // 存储基础URL用于后续认证
