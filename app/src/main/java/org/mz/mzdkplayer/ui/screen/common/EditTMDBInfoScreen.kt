@@ -54,6 +54,8 @@ import androidx.compose.ui.res.painterResource
 import androidx.tv.material3.Icon
 import org.mz.mzdkplayer.di.RepositoryProvider
 import org.mz.mzdkplayer.tool.viewModelWithFactory
+import org.mz.mzdkplayer.ui.theme.myFileTypeCardScaleStyle
+import org.mz.mzdkplayer.ui.theme.myListItemCoverColor
 import org.mz.mzdkplayer.ui.theme.mySideFilterChipColor
 
 @OptIn(ExperimentalTvMaterial3Api::class)
@@ -147,7 +149,7 @@ fun EditTMDBInfoScreen(
                     selected = !isSearchMovie,
                     onClick = { isSearchMovie = false },
                     colors = mySideFilterChipColor(),
-                    leadingIcon = { if (isSearchMovie) Icon(painterResource(R.drawable.check24dp), contentDescription = null) },
+                    leadingIcon = { if (!isSearchMovie) Icon(painterResource(R.drawable.check24dp), contentDescription = null) },
                     modifier = Modifier.padding(end = 8.dp)
                 ){
                     Text("剧集")
@@ -191,7 +193,7 @@ fun EditTMDBInfoScreen(
 
             // 4. 搜索按钮
             MyIconButton(
-                text = "搜 索 TMDB",
+                text = "搜索TMDB",
                 icon = R.drawable.baseline_search_24, // 假设你有这个图标，如果没有可以用默认的
                 modifier = Modifier.fillMaxWidth(),
                 onClick = {
@@ -234,7 +236,7 @@ fun EditTMDBInfoScreen(
                             "搜索结果 (点击确认)",
                             color = Color.LightGray,
                             fontSize = 12.sp,
-                            modifier = Modifier.padding(bottom = 8.dp)
+                            modifier = Modifier.padding(start = 8.dp, bottom = 8.dp)
                         )
                         LazyColumn(
                             verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -258,11 +260,8 @@ fun EditTMDBInfoScreen(
                                         Toast.makeText(context, "已修正为: ${item.title}", Toast.LENGTH_SHORT).show()
                                         //navController.popBackStack() // 返回上一页
                                     },
-                                    colors = ListItemDefaults.colors(
-                                        containerColor = Color(0xFF2B2B2B),
-                                        focusedContainerColor = Color(0xFF444444), // MaterialTheme.colorScheme.primaryContainer
-                                        contentColor = Color.White
-                                    ),
+                                    colors = myListItemCoverColor(),
+                                    scale = ListItemDefaults.scale(focusedScale = 1.02f),
                                     leadingContent = {
                                         AsyncImage(
                                             model = "https://image.tmdb.org/t/p/w200${item.posterPath}",
@@ -281,8 +280,8 @@ fun EditTMDBInfoScreen(
                                         val date = item.releaseDate ?: "未知日期"
                                         val overview = item.overview.ifBlank { "暂无简介" }
                                         Column {
-                                            Text(date, fontSize = 12.sp, color = Color.Gray)
-                                            Text(overview, maxLines = 2, overflow = TextOverflow.Ellipsis, fontSize = 10.sp, color = Color.Gray)
+                                            Text(date, fontSize = 12.sp)
+                                            Text(overview, maxLines = 2, overflow = TextOverflow.Ellipsis, fontSize = 10.sp)
                                         }
                                     }
                                 )

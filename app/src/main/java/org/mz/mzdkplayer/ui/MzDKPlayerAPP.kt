@@ -64,6 +64,7 @@ import org.mz.mzdkplayer.ui.screen.httplink.HTTPLinkConListScreen
 import org.mz.mzdkplayer.ui.screen.localfile.LocalFileListScreen
 import org.mz.mzdkplayer.ui.screen.localfile.LocalFileTypeScreen
 import org.mz.mzdkplayer.ui.screen.httplink.HTTPLinkConScreen
+import org.mz.mzdkplayer.ui.screen.library.AudioLibraryScreen
 import org.mz.mzdkplayer.ui.screen.library.MovieLibraryScreen
 import org.mz.mzdkplayer.ui.screen.library.TvLibraryScreen
 import org.mz.mzdkplayer.ui.screen.nfs.NFSConListScreen
@@ -79,6 +80,7 @@ import org.mz.mzdkplayer.ui.screen.webdavfile.WebDavConScreen
 import org.mz.mzdkplayer.ui.screen.webdavfile.WebDavFileListScreen
 import org.mz.mzdkplayer.ui.screen.setting.SettingsScreen
 import org.mz.mzdkplayer.ui.screen.tv.TVSeriesDetailsScreen
+import org.mz.mzdkplayer.ui.screen.vm.AudioViewModel
 
 import org.mz.mzdkplayer.ui.screen.vm.MediaHistoryViewModel
 import org.mz.mzdkplayer.ui.screen.vm.MediaLibraryViewModel
@@ -101,6 +103,7 @@ fun MzDKPlayerAPP(externalVideoUri: Uri?) {
 
             "电影" to painterResource(id = R.drawable.moviefileicon),
             "电视" to painterResource(id = R.drawable.tv24dp),
+            "音乐" to painterResource(id = R.drawable.librarymusic24dp),
             "继续播放" to painterResource(id = R.drawable.history24dp),
             "文件浏览" to painterResource(id = R.drawable.baseline_folder_24),
             "搜索" to painterResource(id = R.drawable.baseline_search_24),
@@ -154,6 +157,9 @@ fun MzDKPlayerAPP(externalVideoUri: Uri?) {
     val libraryViewModel: MediaLibraryViewModel = viewModelWithFactory {
         RepositoryProvider.createMediaLibraryViewModel()
     }
+    val audioViewModel: AudioViewModel = viewModelWithFactory {
+        RepositoryProvider.createAudioViewModel()
+    }
 
     val mediaHistoryViewModel: MediaHistoryViewModel = viewModelWithFactory {RepositoryProvider.createMediaHistoryViewModel()  }
     val settingsVM: SettingsViewModel = viewModel()
@@ -182,7 +188,8 @@ fun MzDKPlayerAPP(externalVideoUri: Uri?) {
                             .widthIn(50.dp, 50.dp)
                             .selectableGroup()
                             .focusRequester(focusRequester = sideFocusRequest),
-                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                        // 👇 这样写：既保持 10.dp 间距，又让整个内容块在 Column 中居中
+                        verticalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterVertically),
                     ) {
                         items.forEachIndexed { index, item ->
                             val (text, icon) = item
@@ -218,7 +225,15 @@ fun MzDKPlayerAPP(externalVideoUri: Uri?) {
                                                     inclusive = true
                                                 }
                                             })
-                                        2 -> homeNavController.navigate(
+                                        2 ->homeNavController.navigate(
+                                            "AudioLibraryPage",
+                                            navOptions = navOptions {
+                                                launchSingleTop = true
+                                                popUpTo("AudioLibraryPage") {
+                                                    inclusive = true
+                                                }
+                                            })
+                                        3 -> homeNavController.navigate(
                                             "HistoryPage",
                                             navOptions = navOptions {
                                                 launchSingleTop = true
@@ -226,7 +241,7 @@ fun MzDKPlayerAPP(externalVideoUri: Uri?) {
                                                     inclusive = true
                                                 }
                                             })
-                                        3 -> homeNavController.navigate(
+                                        4 -> homeNavController.navigate(
                                             "FileHomePage",
                                             navOptions = navOptions {
                                                 launchSingleTop = true
@@ -234,7 +249,7 @@ fun MzDKPlayerAPP(externalVideoUri: Uri?) {
                                                     inclusive = true
                                                 }
                                             })
-                                        4 ->homeNavController.navigate(
+                                        5 ->homeNavController.navigate(
                                             "SearchPage",
                                             navOptions = navOptions {
                                                 launchSingleTop = true
@@ -243,7 +258,7 @@ fun MzDKPlayerAPP(externalVideoUri: Uri?) {
                                                 }
                                             })
 
-                                        5 -> homeNavController.navigate(
+                                        6 -> homeNavController.navigate(
                                             "SettingsPage",
                                             navOptions = navOptions {
                                                 launchSingleTop = true
@@ -284,7 +299,7 @@ fun MzDKPlayerAPP(externalVideoUri: Uri?) {
                         }
                         composable("SettingsPage") {
                             //页面路由对应的页面组件
-                            SettingsScreen(mainNavController,settingsVM)
+                            SettingsScreen(mainNavController,settingsVM,audioViewModel)
                         }
                         composable("HistoryPage") {
                             //页面路由对应的页面组件
@@ -298,6 +313,10 @@ fun MzDKPlayerAPP(externalVideoUri: Uri?) {
                         composable("TvLibraryPage") {
                             //页面路由对应的页面组件
                             TvLibraryScreen(libraryViewModel,mainNavController,homeNavController,settingsVM)
+                        }
+                        composable("AudioLibraryPage") {
+                            //页面路由对应的页面组件
+                            AudioLibraryScreen(audioViewModel,homeNavController,mainNavController)
                         }
                         composable("SearchPage") {
                             //页面路由对应的页面组件

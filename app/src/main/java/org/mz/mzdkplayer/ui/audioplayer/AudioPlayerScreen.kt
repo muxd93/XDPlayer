@@ -448,9 +448,10 @@ fun AudioPlayerScreen(
                 modifier = Modifier
                     .align(Alignment.BottomCenter) // 对齐到底部
                     .fillMaxWidth()
-                    .height(200.dp) // 高度限制
-                    .padding(bottom = 120.dp) // 避开底部的控制栏
+                    .height(60.dp) // 高度限制
+                    .padding(bottom = 0.dp) // 避开底部的控制栏
                     .alpha(0.3f), // 设置透明度，不要太抢眼
+                barCount = 100,
                // color = MaterialTheme.colorScheme.primary // 使用主题色
             )
         }

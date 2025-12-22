@@ -2,13 +2,11 @@ package org.mz.mzdkplayer.ui.screen.search
 
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import org.mz.mzdkplayer.di.RepositoryProvider
 import org.mz.mzdkplayer.di.RepositoryProvider.createSearchViewModel
 import org.mz.mzdkplayer.tool.viewModelWithFactory
 import org.mz.mzdkplayer.ui.screen.vm.SearchViewModel
 
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -36,7 +34,6 @@ import androidx.navigation.NavController
 import androidx.paging.LoadState
 import androidx.paging.compose.collectAsLazyPagingItems
 
-import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import org.mz.mzdkplayer.R
 import org.mz.mzdkplayer.ui.screen.common.MediaCard
@@ -137,7 +134,8 @@ fun SearchScreen(
                                         "MovieDetails/$encodedUri/${media.dataSourceType}/$encodedFileName/$connectionName/${media.tmdbId}"
                                     )
                                 }
-                            }
+                            },
+                            onLongClick = {}
                         )
                     }
                 }
@@ -167,7 +165,8 @@ fun SearchScreen(
                 navController.navigate(
                     "TVSeriesDetails/$encodedUri/${episode.dataSourceType}/$encodedFileName/$connectionName/${episode.tmdbId}/${episode.seasonNumber}/${episode.episodeNumber}"
                 )
-            }
+            },
+            navController = navController
         )
     }
 }

@@ -574,7 +574,7 @@ class MovieViewModel(private val repository: TmdbRepository,private val mediaDao
         episodeNumber: Int,       // 用户输入的集 (仅TV有效)
         originalFileName: String,
         dataSourceType: String = "SMB", // 默认，可视情况传参
-        connectionName: String = ""     // 默认，可视情况传参
+        connectionName: String = "电影"     // 默认，可视情况传参
     ) {
         viewModelScope.launch(Dispatchers.IO) {
             // 先尝试获取旧记录以保留一些元数据（如 connectionName）

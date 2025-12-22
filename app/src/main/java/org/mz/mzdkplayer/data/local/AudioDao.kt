@@ -1,0 +1,32 @@
+package org.mz.mzdkplayer.data.local
+
+
+
+import androidx.room.Dao
+import androidx.room.Insert
+import androidx.room.OnConflictStrategy
+import androidx.room.Query
+import androidx.room.Update
+import kotlinx.coroutines.flow.Flow
+
+@Dao
+interface AudioDao {
+    @Query("SELECT * FROM audio_cache WHERE audioUri = :uri LIMIT 1")
+    suspend fun getAudioByUri(uri: String): AudioCacheEntity?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAudio(audio: AudioCacheEntity)
+
+    // 列表页使用：按添加时间倒序
+    @Query("SELECT * FROM audio_cache ORDER BY dateAdded DESC")
+    fun getAllAudio(): Flow<List<AudioCacheEntity>>
+
+    // 搜索功能 (可选)
+    @Query("SELECT * FROM audio_cache WHERE title LIKE '%' || :query || '%' OR artist LIKE '%' || :query || '%'")
+    suspend fun searchAudio(query: String): List<AudioCacheEntity>
+    // 用于回写详细信息
+    @Update
+    suspend fun updateAudio(audio: AudioCacheEntity)
+    @Query("DELETE FROM audio_cache")
+    suspend fun clearAllAudio()
+}

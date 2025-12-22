@@ -84,7 +84,7 @@ fun MyFileDialog(
                 .padding(16.dp)
                 .align(Alignment.Center)) {
                 if (fileName != null) {
-                    Text(text = fileName, style = MaterialTheme.typography.titleSmall, maxLines = 1)
+                    Text(text = fileName, style = MaterialTheme.typography.titleSmall, maxLines = 1, color = Color.White)
                 }
                 Spacer(modifier = Modifier.height(16.dp))
                 MyIconButton(

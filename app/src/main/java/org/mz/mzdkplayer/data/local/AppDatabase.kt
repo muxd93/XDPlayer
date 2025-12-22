@@ -7,11 +7,11 @@ import androidx.room.RoomDatabase
 import androidx.room.migration.Migration // 👈 记得导入
 import androidx.sqlite.db.SupportSQLiteDatabase // 👈 记得导入
 
-@Database(entities = [MediaCacheEntity::class,MediaHistoryEntity::class], version = 4, exportSchema = false) // 👈 版本改为 4
+@Database(entities = [MediaCacheEntity::class,MediaHistoryEntity::class,AudioCacheEntity::class ], version = 5, exportSchema = false) // 👈 版本改为 4
 abstract class AppDatabase : RoomDatabase() {
     abstract fun mediaDao(): MediaDao
     abstract fun mediaHistoryDao(): MediaHistoryDao // 新增
-
+    abstract fun audioDao(): AudioDao //  3. 新增 AudioDao 访问接口
     companion object {
         @Volatile
         private var INSTANCE: AppDatabase? = null
@@ -66,6 +66,32 @@ abstract class AppDatabase : RoomDatabase() {
                 db.execSQL("CREATE INDEX IF NOT EXISTS `index_media_cache_tmdbId` ON `media_cache` (`tmdbId`)")
             }
         }
+        // 定义 V4 到 V5 的迁移：创建 audio_cache 表
+        val MIGRATION_4_5: Migration = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // 创建音频缓存表
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS `audio_cache` (
+                        `audioUri` TEXT NOT NULL, 
+                        `dataSourceType` TEXT NOT NULL, 
+                        `fileName` TEXT NOT NULL, 
+                        `connectionName` TEXT NOT NULL, 
+                        `title` TEXT NOT NULL, 
+                        `artist` TEXT NOT NULL, 
+                        `album` TEXT NOT NULL, 
+                        `duration` INTEGER NOT NULL DEFAULT 0, 
+                        `localCoverPath` TEXT, 
+                        `lyrics` TEXT, 
+                        `dateAdded` INTEGER NOT NULL, 
+                        PRIMARY KEY(`audioUri`)
+                    )
+                """.trimIndent())
+
+                // 为常用查询字段添加索引（歌手、专辑）
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_audio_cache_artist` ON `audio_cache` (`artist`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_audio_cache_album` ON `audio_cache` (`album`)")
+            }
+        }
         fun getDatabase(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -73,7 +99,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "mzdk_player_database"
                 )
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3,MIGRATION_3_4) // 添加迁移
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3,MIGRATION_3_4,MIGRATION_4_5) // 添加迁移
                     .build()
                 INSTANCE = instance
                 instance

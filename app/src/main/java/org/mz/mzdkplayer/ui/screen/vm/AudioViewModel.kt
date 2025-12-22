@@ -1,0 +1,97 @@
+package org.mz.mzdkplayer.ui.screen.vm
+
+
+
+import android.util.Log
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
+import org.mz.mzdkplayer.data.local.AudioCacheEntity
+import org.mz.mzdkplayer.data.local.AudioDao
+import org.mz.mzdkplayer.tool.AudioNameParser
+
+class AudioViewModel(
+    private val audioDao: AudioDao
+) : ViewModel() {
+
+    private val _allAudio = MutableStateFlow<List<AudioCacheEntity>>(emptyList())
+    val allAudio: StateFlow<List<AudioCacheEntity>> = _allAudio.asStateFlow()
+
+    // 扫描状态
+    private val _isScanning = MutableStateFlow(false)
+    val isScanning = _isScanning.asStateFlow()
+
+    init {
+        // 监听数据库变化，实时更新 UI
+        viewModelScope.launch {
+            audioDao.getAllAudio().collect {
+                _allAudio.value = it
+            }
+        }
+    }
+
+    /**
+     * 纯文件名解析入库 (极速模式)
+     * 不需要 InputStream，不需要网络请求
+     */
+    fun batchScrapeAudioInfo(
+        audioList: List<Pair<String, String>>, // fileName, audioUri
+        dataSourceType: String,
+        connectionName: String
+    ) {
+        if (_isScanning.value) return
+
+        viewModelScope.launch(Dispatchers.IO) {
+            _isScanning.value = true
+            Log.d("AudioViewModel", "开始快速扫描音频，数量: ${audioList.size}")
+
+            try {
+                // 批量处理
+                val newEntities = audioList.map { (fileName, audioUri) ->
+                    // 1. 查重 (如果数据量极大，建议一次性查出所有存在的 URI 做内存比对，这里简单起见逐个查)
+                    // 为了性能，如果确定是覆盖更新，也可以跳过查重直接 replace
+//                    if (audioDao.getAudioByUri(audioUri) != null) {
+//                        return@mapNotNull null
+//                    }
+
+                    // 2. 解析文件名
+                    val metadata = AudioNameParser.parse(fileName)
+
+                    // 3. 构建实体
+                    AudioCacheEntity(
+                        audioUri = audioUri,
+                        dataSourceType = dataSourceType,
+                        fileName = fileName,
+                        connectionName = connectionName,
+                        title = metadata.title,
+                        artist = metadata.artist,
+                        album = metadata.album,
+                        duration = 0 // 暂无时长
+                    )
+                }
+
+                // 4. 插入数据库 (建议在 DAO 里加一个 @Insert insertAll(list) 提高性能)
+                newEntities.forEach {
+                    audioDao.insertAudio(it)
+                }
+
+                Log.d("AudioViewModel", "扫描完成，新增入库: ${newEntities.size} 首")
+
+            } catch (e: Exception) {
+                Log.e("AudioViewModel", "扫描出错", e)
+            } finally {
+                _isScanning.value = false
+            }
+        }
+    }
+
+    fun clearLibrary() {
+        viewModelScope.launch(Dispatchers.IO) {
+            audioDao.clearAllAudio()
+        }
+    }
+}

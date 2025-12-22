@@ -28,11 +28,13 @@ fun MediaCard(
     posterPath: String?,
     year: String?,
     modifier: Modifier = Modifier,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    onLongClick: () -> Unit,
 ) {
     // 使用基础 Card，完全自定义内部布局，避免 StandardCard/ClassicCard 版本兼容问题
     Card(
         onClick = onClick,
+        onLongClick = onLongClick,
         modifier = modifier
             .aspectRatio(2f / 3f), // 电影海报标准比例
         shape = CardDefaults.shape(shape = RoundedCornerShape(12.dp)),

@@ -56,10 +56,12 @@ import org.mz.mzdkplayer.data.local.MediaCacheEntity
 import org.mz.mzdkplayer.ui.screen.common.LibraryEmpty
 import org.mz.mzdkplayer.ui.screen.common.LoadingScreen
 import org.mz.mzdkplayer.ui.screen.common.MediaCard
+import org.mz.mzdkplayer.ui.screen.common.MyFileDialog
 import org.mz.mzdkplayer.ui.screen.vm.MediaLibraryViewModel
 import org.mz.mzdkplayer.ui.screen.vm.SettingsViewModel
 import org.mz.mzdkplayer.ui.theme.myListItemCoverColor
 import java.net.URLEncoder
+import java.util.Locale
 
 // === 电影屏幕 (原生 Box 实现沉浸式列表 - 修复卡片遮挡) ===
 @OptIn(ExperimentalTvMaterial3Api::class)
@@ -83,6 +85,8 @@ fun MovieLibraryScreen(
     val settingsState by settingsViewModel.uiState.collectAsState()
     val isMoviesLoading = movies.loadState.refresh == LoadState.Loading
     val isMoviesEmpty = movies.itemCount == 0
+    // 控制弹窗显示
+    var showEditDialog by remember { mutableStateOf(false) }
     // 在版本加载完成后，检查版本数量
     LaunchedEffect(movieVersions.size, checkVersionsAfterLoad) {
         if (checkVersionsAfterLoad && movieVersions.isNotEmpty()) {
@@ -226,7 +230,8 @@ fun MovieLibraryScreen(
                                     viewModel.clearSelectedMovieVersions()
                                     viewModel.loadMovieVersions(movie.tmdbId)
                                     checkVersionsAfterLoad = true
-                                }
+                                },
+                                onLongClick = {showEditDialog=true}
                             )
                         }
                     }
@@ -267,7 +272,7 @@ fun MovieLibraryScreen(
 
                         // 元数据行：年份 | 评分
                         val year = movie.releaseDate?.take(4) ?: ""
-                        val rating = String.format("%.1f", movie.voteAverage)
+                        val rating = String.format(Locale.getDefault(),"%.1f", movie.voteAverage)
                         Text(
                             text = "$year  •  TMDB $rating",
                             style = MaterialTheme.typography.titleMedium,
@@ -339,7 +344,21 @@ fun MovieLibraryScreen(
                 }else{
                     navController.navigate("VideoPlayer/$encodedUri/${version.dataSourceType}/$encodedFileName/$connectionName")
                 }
+            },
+            onLongClick = {
+                showEditDialog = true
             }
+        )
+    }
+    if (showEditDialog) {
+        MyFileDialog(
+            onDismiss = { showEditDialog = false },
+            fileName = focusedMovie?.fileName,
+            onEditClick = {
+                showEditDialog = false
+                navController.navigate("EditTMDBInfoScreen/${URLEncoder.encode(focusedMovie?.videoUri,"UTF-8")}")
+            },
+            onCloseClick = { showEditDialog = false }
         )
     }
 }
@@ -351,7 +370,8 @@ fun MovieVersionSelectionDialog(
     title: String,
     versions: List<MediaCacheEntity>,
     onDismiss: () -> Unit,
-    onVersionClick: (MediaCacheEntity) -> Unit
+    onVersionClick: (MediaCacheEntity) -> Unit,
+    onLongClick: () -> Unit,
 ) {
     Dialog(onDismissRequest = onDismiss) {
         Surface(
@@ -382,6 +402,7 @@ fun MovieVersionSelectionDialog(
                             ListItem(
                                 selected = false,
                                 onClick = { onVersionClick(version) },
+                                onLongClick = { onLongClick() },
                                 modifier = Modifier.fillMaxWidth(),
                                 colors = myListItemCoverColor(),
                                 overlineContent = {

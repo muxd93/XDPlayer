@@ -6,6 +6,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -55,6 +56,7 @@ import org.mz.mzdkplayer.data.local.MediaCacheEntity
 import org.mz.mzdkplayer.ui.screen.common.LibraryEmpty
 import org.mz.mzdkplayer.ui.screen.common.LoadingScreen
 import org.mz.mzdkplayer.ui.screen.common.MediaCard
+import org.mz.mzdkplayer.ui.screen.common.MyFileDialog
 import org.mz.mzdkplayer.ui.screen.vm.MediaLibraryViewModel
 import org.mz.mzdkplayer.ui.screen.vm.SettingsViewModel
 import org.mz.mzdkplayer.ui.theme.myListItemCoverColor
@@ -80,6 +82,8 @@ fun TvLibraryScreen(
     var showEpisodeDialog by remember { mutableStateOf(false) }
     var selectedSeriesName by remember { mutableStateOf("") }
     val settingsState by settingsViewModel.uiState.collectAsState()
+    // 控制弹窗显示
+    var showEditDialog by remember { mutableStateOf(false) }
     // 如果刚进入页面没有焦点，默认尝试获取列表第一个作为背景
     LaunchedEffect(tvSeriesList.itemSnapshotList.items) {
         if (focusedTvShow == null && tvSeriesList.itemCount > 0) {
@@ -89,7 +93,7 @@ fun TvLibraryScreen(
     if (isTvSeriesLoading) {
         LoadingScreen(modifier = Modifier.fillMaxSize())
     } else if (isTvSeriesEmpty) {
-        LibraryEmpty(navController = homeNavController, isMovie = false)
+        LibraryEmpty(navController = homeNavController, type = "tv")
     } else {
         // === 使用 Box 容器来实现 ImmersiveList 的效果 ===
         Box(modifier = Modifier.fillMaxSize())
@@ -200,7 +204,8 @@ fun TvLibraryScreen(
                                     selectedSeriesName = tvShow.title
                                     viewModel.loadEpisodes(tvShow.tmdbId)
                                     showEpisodeDialog = true
-                                }
+                                },
+                                onLongClick = {showEditDialog = true}
                             )
                         }
                     }
@@ -299,6 +304,7 @@ fun TvLibraryScreen(
         EpisodeSelectionDialog(
             title = selectedSeriesName,
             episodes = episodes,
+            navController = navController, // 传入 navController
             onDismiss = {
                 showEpisodeDialog = false
                 viewModel.clearSelectedEpisodes()
@@ -324,6 +330,17 @@ fun TvLibraryScreen(
             }
         )
     }
+    if (showEditDialog) {
+        MyFileDialog(
+            onDismiss = { showEditDialog = false },
+            fileName = focusedTvShow?.fileName,
+            onEditClick = {
+                showEditDialog = false
+                navController.navigate("EditTMDBInfoScreen/${URLEncoder.encode(focusedTvShow?.videoUri,"UTF-8")}")
+            },
+            onCloseClick = { showEditDialog = false }
+        )
+    }
 }
 
 //弹窗组件 (保持原样，无需修改)
@@ -333,8 +350,11 @@ fun EpisodeSelectionDialog(
     title: String,
     episodes: List<MediaCacheEntity>,
     onDismiss: () -> Unit,
-    onEpisodeClick: (MediaCacheEntity) -> Unit
+    onEpisodeClick: (MediaCacheEntity) -> Unit,
+    navController: NavController
 ) {
+    // 状态：当前选中的、准备编辑的单集
+    var selectedEpisodeForEdit by remember { mutableStateOf<MediaCacheEntity?>(null) }
     Dialog(onDismissRequest = onDismiss) {
         Surface(
             modifier = Modifier
@@ -365,6 +385,7 @@ fun EpisodeSelectionDialog(
                             ListItem(
                                 selected = false, // 焦点控制由 TV 框架自动处理
                                 onClick = { onEpisodeClick(episode) },
+                                onLongClick = { selectedEpisodeForEdit = episode},
                                 modifier = Modifier.fillMaxWidth(),
                                 colors = myListItemCoverColor(),
                                 // headlineContent: 显示季集序号
@@ -396,6 +417,26 @@ fun EpisodeSelectionDialog(
                     }
                 }
             }
+
         }
     }
+    // --- 在这里插入长按后的二级弹窗 ---
+    if (selectedEpisodeForEdit != null) {
+        MyFileDialog(
+            onDismiss = { selectedEpisodeForEdit = null },
+            fileName = selectedEpisodeForEdit?.fileName,
+            onEditClick = {
+                val episode = selectedEpisodeForEdit
+                if (episode != null) {
+                    val encodedUri = URLEncoder.encode(episode.videoUri, "UTF-8")
+                    // 跳转到修改页面
+                    navController.navigate("EditTMDBInfoScreen/$encodedUri")
+                }
+                selectedEpisodeForEdit = null // 关闭菜单
+                onDismiss() // 如果需要，跳转后可以关闭剧集选择弹窗
+            },
+            onCloseClick = { selectedEpisodeForEdit = null }
+        )
+    }
+
 }

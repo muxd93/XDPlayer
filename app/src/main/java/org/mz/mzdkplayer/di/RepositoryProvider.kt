@@ -6,6 +6,7 @@ import android.content.Context
 import org.mz.mzdkplayer.data.local.AppDatabase
 import org.mz.mzdkplayer.data.repository.TmdbRepository
 import org.mz.mzdkplayer.data.repository.RoomMediaHistoryRepository // 👈 记得导入新的 Repository
+import org.mz.mzdkplayer.ui.screen.vm.AudioViewModel
 import org.mz.mzdkplayer.ui.screen.vm.MediaHistoryViewModel
 import org.mz.mzdkplayer.ui.screen.vm.MediaLibraryViewModel
 import org.mz.mzdkplayer.ui.screen.vm.MovieViewModel
@@ -27,7 +28,10 @@ object RepositoryProvider {
         val db = database ?: throw IllegalStateException("RepositoryProvider.init(context) must be called before creating ViewModels")
         return MovieViewModel(tmdbRepository, db.mediaDao())
     }
-
+    fun createAudioViewModel(): AudioViewModel {
+        val db = database ?: throw IllegalStateException("RepositoryProvider.init(context) must be called before creating ViewModels")
+        return AudioViewModel(audioDao = db.audioDao())
+    }
     fun createMediaLibraryViewModel(): MediaLibraryViewModel {
         val db = database ?: throw IllegalStateException("RepositoryProvider.init(context) must be called before creating ViewModels")
         return MediaLibraryViewModel(db.mediaDao())
