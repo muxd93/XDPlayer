@@ -111,8 +111,9 @@
 
 ### 主界面与文件列表
 
-![主界面截图](screenshots/Screenshot_20251220_112811.webp)
+![主界面截图](screenshots/Screenshot_20251223_175954.webp)
 ![主界面截图](screenshots/Screenshot_20251116_163213.webp)
+![主界面截图](screenshots/Screenshot_20251223_174613.webp)
 ![主界面截图](screenshots/Screenshot_20251220_123857.webp)
 
 ### 播放界面与弹幕效果
