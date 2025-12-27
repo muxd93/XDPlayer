@@ -158,21 +158,21 @@ fun ScrollableLyricsView(
             }
 
             // 顶部过渡效果 - 覆盖在内容上方，但不增加额外高度
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(blurHeight)
-                    .background(topGradient)
-            )
+//            Box(
+//                modifier = Modifier
+//                    .fillMaxWidth()
+//                    .height(blurHeight)
+//                    .background(topGradient)
+//            )
 
             // 底部过渡效果 - 覆盖在内容下方，但不增加额外高度
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(blurHeight)
-                    .align(Alignment.BottomCenter)
-                    .background(bottomGradient)
-            )
+//            Box(
+//                modifier = Modifier
+//                    .fillMaxWidth()
+//                    .height(blurHeight)
+//                    .align(Alignment.BottomCenter)
+//                    .background(bottomGradient)
+//            )
         }
     }
 }
