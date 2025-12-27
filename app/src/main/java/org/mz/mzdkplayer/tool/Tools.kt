@@ -2,6 +2,10 @@ package org.mz.mzdkplayer.tool
 
 
 import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.graphics.Canvas
+import android.os.Build
 import android.util.Log
 import android.widget.Toast
 import androidx.annotation.OptIn
@@ -16,7 +20,11 @@ import androidx.media3.common.util.UnstableApi
 
 
 import org.mz.mzdkplayer.R
+import java.io.File
+import java.io.FileOutputStream
 import java.util.Locale
+import androidx.core.graphics.scale
+import androidx.core.graphics.createBitmap
 
 object Tools {
     fun extractFileExtension(fileName: String?): String {
@@ -561,29 +569,89 @@ object Tools {
     }
 
 
-    fun saveCoverImageToInternalStorage(context: android.content.Context, uri: String, artworkData: ByteArray?): String? {
+    fun saveCoverImageToInternalStorage(context: Context, uri: String, artworkData: ByteArray?): String? {
         if (artworkData == null || artworkData.isEmpty()) return null
 
         try {
-            // 使用 URI 的哈希值作为文件名，避免特殊字符问题
-            val fileName = "cover_${uri.hashCode()}.jpg"
-            val directory = java.io.File(context.filesDir, "audio_covers")
-            if (!directory.exists()) {
-                directory.mkdirs()
-            }
+            val fileName = "cover_${uri.hashCode()}.webp"
+            val directory = File(context.filesDir, "audio_covers")
+            if (!directory.exists()) directory.mkdirs()
 
-            val file = java.io.File(directory, fileName)
-            // 如果文件已存在，可以根据需求决定是否覆盖。这里为了性能，如果存在就不写了
+            val file = File(directory, fileName)
             if (file.exists()) return file.absolutePath
 
-            java.io.FileOutputStream(file).use { fos ->
-                fos.write(artworkData)
+            // 1. 预读尺寸
+            val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            BitmapFactory.decodeByteArray(artworkData, 0, artworkData.size, options)
+
+            // 2. 初步采样缩放（减少内存占用）
+            options.inSampleSize = calculateInSampleSize(options, 650, 650)
+            options.inJustDecodeBounds = false
+            val rawBitmap = BitmapFactory.decodeByteArray(artworkData, 0, artworkData.size, options) ?: return null
+
+            // 3. 执行居中裁剪并缩放到 650x650
+            val finalBitmap = centerCropAndScale(rawBitmap, 650, 650)
+
+            // 4. 保存为 WebP
+            FileOutputStream(file).use { fos ->
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                    finalBitmap.compress(Bitmap.CompressFormat.WEBP_LOSSY, 80, fos)
+                } else {
+                    @Suppress("DEPRECATION")
+                    finalBitmap.compress(Bitmap.CompressFormat.WEBP, 80, fos)
+                }
             }
+
+            // 5. 释放内存
+            if (rawBitmap != finalBitmap) rawBitmap.recycle()
+            finalBitmap.recycle()
+
             return file.absolutePath
         } catch (e: Exception) {
-            Log.e("AudioPlayerScreen", "保存封面失败", e)
+            Log.e("AudioPlayerScreen", "保存裁剪后的封面失败", e)
             return null
         }
+    }
+
+    /**
+     * 居中裁剪并缩放逻辑
+     */
+    private fun centerCropAndScale(source: Bitmap, targetWidth: Int, targetHeight: Int): Bitmap {
+        val sourceWidth = source.width
+        val sourceHeight = source.height
+
+        // 计算缩放比例（取大的那一边，保证铺满目标区域）
+        val scale =
+            (targetWidth.toFloat() / sourceWidth).coerceAtLeast(targetHeight.toFloat() / sourceHeight)
+
+        val scaledWidth = scale * sourceWidth
+        val scaledHeight = scale * sourceHeight
+
+        // 计算裁剪区域（在原图基础上计算居中的矩形）
+        val left = (targetWidth - scaledWidth) / 2
+        val top = (targetHeight - scaledHeight) / 2
+
+        val destRect = android.graphics.RectF(left, top, left + scaledWidth, top + scaledHeight)
+
+        // 创建目标画布
+        val output = createBitmap(targetWidth, targetHeight)
+        val canvas = Canvas(output)
+        canvas.drawBitmap(source, null, destRect, android.graphics.Paint(android.graphics.Paint.FILTER_BITMAP_FLAG))
+
+        return output
+    }
+
+    private fun calculateInSampleSize(options: BitmapFactory.Options, reqWidth: Int, reqHeight: Int): Int {
+        val (height: Int, width: Int) = options.outHeight to options.outWidth
+        var inSampleSize = 1
+        if (height > reqHeight || width > reqWidth) {
+            val halfHeight = height / 2
+            val halfWidth = width / 2
+            while (halfHeight / inSampleSize >= reqHeight && halfWidth / inSampleSize >= reqWidth) {
+                inSampleSize *= 2
+            }
+        }
+        return inSampleSize
     }
 }
 

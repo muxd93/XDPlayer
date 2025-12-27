@@ -52,7 +52,8 @@ data class MediaCacheEntity(
     val episodeStillPath: String? = null,
     val episodeAirDate: String? = null,
     val episodeRuntime: Int? = null,
-
+    // 添加时间
+    val dateAdded: Long = System.currentTimeMillis(),
     // 【新增字段】groupKey (必须与 MIGRATION_3_4 对应)
     val groupKey: String,
 ) {

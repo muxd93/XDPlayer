@@ -1,140 +1,210 @@
-package org.mz.mzdkplayer.ui.audioplayer.components
-
-import androidx.annotation.OptIn
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.runtime.Composable
+import androidx.compose.foundation.layout.size
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.graphics.painter.Painter
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.media3.common.C
+import org.mz.mzdkplayer.ui.audioplayer.components.AudioPlayerProgressBar
+
+
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.painter.Painter
+import androidx.compose.ui.res.painterResource
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
 import org.mz.mzdkplayer.R
+import org.mz.mzdkplayer.ui.audioplayer.components.AudioPlayerControlsIcon
+import org.mz.mzdkplayer.ui.audioplayer.components.AudioPlayerState
 import org.mz.mzdkplayer.ui.screen.vm.AudioPlayerViewModel
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 
-// --- 控件 ---
-@OptIn(UnstableApi::class)
+
 @Composable
 fun AudioPlayerControls(
     isPlaying: Boolean,
-    contentCurrentPosition: Long, // 安全的当前位置 (ms)
+    contentCurrentPosition: Long,
     exoPlayer: ExoPlayer,
     state: AudioPlayerState,
-    focusRequester: FocusRequester,
-    title: String?,
-    secondaryText: String,
-    tertiaryText: String,
     audioPlayerViewModel: AudioPlayerViewModel,
-    contentDuration: Duration = 0.milliseconds // 添加 contentDuration 参数，默认值
+    contentDuration: Duration = 0.milliseconds
 ) {
     val onPlayPauseToggle = { shouldPlay: Boolean ->
-        if (shouldPlay) {
-            exoPlayer.play()
-        } else {
-            exoPlayer.pause()
-        }
+        if (shouldPlay) exoPlayer.play() else exoPlayer.pause()
     }
 
-    AudioPlayerMainFrame(
-        mediaTitle = {
-            AudioPlayerMediaTitle(
-                title = title,
-                secondaryText = secondaryText,
-                tertiaryText = tertiaryText,
-                type = AudioPlayerMediaTitleType.DEFAULT
-            )
-        },
-        mediaActions = {
+    val onSeek = { progressRatio: Float ->
+        val durationMs =
+            if (exoPlayer.duration != C.TIME_UNSET) exoPlayer.duration else 0L
+        exoPlayer.seekTo((durationMs * progressRatio).toLong())
+    }
+
+    // 🎯 Apple Music 控制岛主体
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 1.dp), // 轻微留白即可
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+
+        // ===== 1️⃣ 进度条 =====
+        AudioPlayerProgressBar(
+            contentProgress = contentCurrentPosition.milliseconds,
+            contentDuration = contentDuration,
+            onSeek = onSeek,
+            state = state
+        )
+
+        // ===== 2️⃣ 控制按钮行 =====
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+
+            // ───── 左侧功能区（播放模式 / 歌词）─────
             Row(
-                modifier = Modifier.padding(bottom = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // 组合按钮：点击循环切换模式（随机播放/重复模式）
                 AudioPlayerControlsIcon(
-                    icon = getCombinedModeIcon(exoPlayer.shuffleModeEnabled, exoPlayer.repeatMode), // 根据当前模式获取对应图标
+                    icon = getCombinedModeIcon(
+                        exoPlayer.shuffleModeEnabled,
+                        exoPlayer.repeatMode
+                    ),
+                    modifier = Modifier
+                        .size(32.dp),
                     state = state,
+                    iconSize = 32,
                     isPlaying = isPlaying,
                     onClick = {
-                        // 循环切换模式：随机播放 -> 重复模式 OFF -> 重复模式 ONE -> 重复模式 ALL -> 随机播放
                         if (exoPlayer.shuffleModeEnabled) {
-                            // 如果随机播放启用，关闭随机播放，设置为重复模式 OFF
                             exoPlayer.shuffleModeEnabled = false
                             exoPlayer.repeatMode = Player.REPEAT_MODE_OFF
                         } else {
-                            // 如果随机播放未启用，循环切换重复模式
-                            val currentMode = exoPlayer.repeatMode
-                            val newMode = when (currentMode) {
-                                Player.REPEAT_MODE_OFF -> Player.REPEAT_MODE_ONE
-                                Player.REPEAT_MODE_ONE -> Player.REPEAT_MODE_ALL
+                            when (exoPlayer.repeatMode) {
+                                Player.REPEAT_MODE_OFF ->
+                                    exoPlayer.repeatMode = Player.REPEAT_MODE_ONE
+                                Player.REPEAT_MODE_ONE ->
+                                    exoPlayer.repeatMode = Player.REPEAT_MODE_ALL
                                 Player.REPEAT_MODE_ALL -> {
-                                    // 如果是重复模式 ALL，开启随机播放
                                     exoPlayer.shuffleModeEnabled = true
-                                    Player.REPEAT_MODE_OFF // 随机播放时通常设置为 OFF
+                                    exoPlayer.repeatMode = Player.REPEAT_MODE_OFF
                                 }
-                                else -> Player.REPEAT_MODE_OFF
-                            }
-                            if (!exoPlayer.shuffleModeEnabled) {
-                                exoPlayer.repeatMode = newMode
                             }
                         }
                     }
                 )
 
                 AudioPlayerControlsIcon(
-                    modifier = Modifier.padding(start = 12.dp),
+                    icon = painterResource(id = R.drawable.lyrics24dp),
+                    state = state,
+                    modifier = Modifier
+                        .size(32.dp),
+                    iconSize = 32,
+                    isPlaying = isPlaying,
+                    onClick = { /* 歌词模式切换 */ }
+                )
+            }
+
+            // 自动把中间播放区推到视觉中心
+            Spacer(modifier = Modifier.weight(1f))
+
+            // ───── 中央播放控制区（Apple Music 核心）─────
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(18.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+
+                AudioPlayerControlsIcon(
+                    icon = painterResource(id = R.drawable.skipprevious),
+                    state = state,
+                    isPlaying = isPlaying,
+                    modifier = Modifier
+                        .size(32.dp),
+                    iconSize = 32,
+                    onClick = { exoPlayer.seekToPreviousMediaItem() }
+                )
+
+                AudioPlayerControlsIcon(
+                    modifier = Modifier
+                        .size(40.dp),
+                    icon = if (isPlaying)
+                        painterResource(id = R.drawable.baseline_pause_24)
+                    else
+                        painterResource(id = R.drawable.baseline_play_arrow_24),
+                    iconSize = 40,
+                    state = state,
+                    isPlaying = isPlaying,
+                    onClick = { onPlayPauseToggle(!isPlaying) }
+                )
+
+                AudioPlayerControlsIcon(
+                    icon = painterResource(id = R.drawable.skipnext),
+                    state = state,
+                    isPlaying = isPlaying,
+                    modifier = Modifier
+                        .size(32.dp),
+                    iconSize = 32,
+                    onClick = { exoPlayer.seekToNextMediaItem() }
+                )
+            }
+
+            Spacer(modifier = Modifier.weight(1f))
+
+            // ───── 右侧功能区（播放列表等）─────
+            Row(
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                AudioPlayerControlsIcon(
                     icon = painterResource(id = R.drawable.queuemusic),
                     state = state,
                     isPlaying = isPlaying,
+                    modifier = Modifier
+                        .size(32.dp),
+                    iconSize = 32,
                     onClick = {
-                        audioPlayerViewModel.atpVisibility = !audioPlayerViewModel.atpVisibility
+                        audioPlayerViewModel.atpVisibility =
+                            !audioPlayerViewModel.atpVisibility
+                    }
+                )
+                AudioPlayerControlsIcon(
+                    icon = painterResource(id = R.drawable.info24dp),
+                    state = state,
+                    isPlaying = isPlaying,
+                    iconSize = 32,
+                    modifier = Modifier
+                        .size(32.dp),
+                    onClick = {
+
                     }
                 )
             }
-        },
-        seeker = {
-            AudioPlayerSeeker(
-                focusRequester,
-                state,
-                isPlaying,
-                onPlayPauseToggle,
-                onSeek = { progressRatio ->
-                    // 确保 duration 有效
-                    val durationMs = if (exoPlayer.duration != C.TIME_UNSET) exoPlayer.duration else 0L
-                    val seekPosition = (durationMs * progressRatio).toLong()
-                    exoPlayer.seekTo(seekPosition)
-                },
-                contentProgress = contentCurrentPosition.milliseconds, // 使用安全的当前位置
-                contentDuration = contentDuration, // 使用传入的安全 Duration,
-                exoPlayer
-            )
-        },
-        more = null
-    )
-}
-
-// 根据随机播放和重复模式返回对应的组合图标资源
-@Composable
-private fun getCombinedModeIcon(isShuffleEnabled: Boolean, repeatMode: Int): Painter {
-    return if (isShuffleEnabled) {
-        // 如果随机播放启用，显示随机播放图标
-        painterResource(id = R.drawable.shufflepaly)
-    } else {
-        // 如果随机播放未启用，根据重复模式显示图标
-        when (repeatMode) {
-            Player.REPEAT_MODE_OFF -> painterResource(id = R.drawable.listsx) // 列表顺序图标
-            Player.REPEAT_MODE_ONE -> painterResource(id = R.drawable.repeatone) // 单曲循环图标
-            Player.REPEAT_MODE_ALL -> painterResource(id = R.drawable.repeatlist) // 列表循环图标
-            else -> painterResource(id = R.drawable.listsx) // 默认返回普通重复图标
         }
     }
 }
 
 
-
+// 别忘了把这个辅助函数也放回 AudioPlayerControls.kt 文件底部
+@Composable
+private fun getCombinedModeIcon(isShuffleEnabled: Boolean, repeatMode: Int): Painter {
+    return if (isShuffleEnabled) {
+        painterResource(id = R.drawable.shufflepaly)
+    } else {
+        when (repeatMode) {
+            Player.REPEAT_MODE_OFF -> painterResource(id = R.drawable.listsx)
+            Player.REPEAT_MODE_ONE -> painterResource(id = R.drawable.repeatone)
+            Player.REPEAT_MODE_ALL -> painterResource(id = R.drawable.repeatlist)
+            else -> painterResource(id = R.drawable.listsx)
+        }
+    }
+}

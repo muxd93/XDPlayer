@@ -37,7 +37,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import org.mz.mzdkplayer.ui.audioplayer.components.CinematicBackground
+
 
 /**
  * Handles the visibility and animation of the controls.

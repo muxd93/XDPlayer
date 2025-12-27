@@ -22,6 +22,8 @@ import androidx.compose.foundation.focusable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
@@ -43,7 +45,7 @@ import org.mz.mzdkplayer.tool.ifElse
 
 
 @Composable
-fun RowScope.AudioPlayerControllerIndicator(
+fun AudioPlayerControllerIndicator(
     progress: Float,
     onSeek: (seekProgress: Float) -> Unit,
     state: AudioPlayerState
@@ -105,7 +107,7 @@ fun RowScope.AudioPlayerControllerIndicator(
     )
     Canvas(
         modifier = Modifier
-            .weight(1f)
+            .fillMaxWidth()
             .height(animatedIndicatorHeight)
             .padding(horizontal = 4.dp) .ifElse(
                 condition = isSelected,

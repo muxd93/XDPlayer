@@ -25,7 +25,9 @@ data class AudioInfo(
     val lyrics: String ?="",
     val sampleRate: String? ="",
     val bitsPerSample: Int?= 16,
-    val artworkData: ByteArray? = byteArrayOf()
+    val artworkData: ByteArray? = byteArrayOf(),
+    val localCoverPath: String?
+
 ) {
     // 重写 equals 和 hashCode 以优雅地处理 ByteArray 的比较
     override fun equals(other: Any?): Boolean {

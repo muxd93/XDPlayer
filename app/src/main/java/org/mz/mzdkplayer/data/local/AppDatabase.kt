@@ -7,7 +7,7 @@ import androidx.room.RoomDatabase
 import androidx.room.migration.Migration // 👈 记得导入
 import androidx.sqlite.db.SupportSQLiteDatabase // 👈 记得导入
 
-@Database(entities = [MediaCacheEntity::class,MediaHistoryEntity::class,AudioCacheEntity::class ], version = 5, exportSchema = false) // 👈 版本改为 4
+@Database(entities = [MediaCacheEntity::class,MediaHistoryEntity::class,AudioCacheEntity::class ], version = 7, exportSchema = false) // 👈 版本改为 4
 abstract class AppDatabase : RoomDatabase() {
     abstract fun mediaDao(): MediaDao
     abstract fun mediaHistoryDao(): MediaHistoryDao // 新增
@@ -92,6 +92,29 @@ abstract class AppDatabase : RoomDatabase() {
                 db.execSQL("CREATE INDEX IF NOT EXISTS `index_audio_cache_album` ON `audio_cache` (`album`)")
             }
         }
+        // 👇 【新增：V5 到 V6 的迁移】 👇
+        val MIGRATION_5_6: Migration = object : Migration(5, 6) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // 1. 为 media_cache 添加 dateAdded 列 (Long 类型在 SQL 中是 INTEGER)
+                // 使用当前时间戳作为默认值
+                val currentTime = System.currentTimeMillis()
+                db.execSQL("ALTER TABLE media_cache ADD COLUMN dateAdded INTEGER NOT NULL DEFAULT $currentTime")
+
+                // 2. 为 audio_cache 添加 isDetailsLoaded 列 (Boolean 类型在 SQL 中是 INTEGER 0 或 1)
+                db.execSQL("ALTER TABLE audio_cache ADD COLUMN isDetailsLoaded INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+        // 👇 【新增：V6 到 V7 的迁移】 👇
+        val MIGRATION_6_7: Migration = object : Migration(6, 7) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // 为 audio_cache 表添加三个新字段
+                // Long 对应 INTEGER, String 对应 TEXT, Int 对应 INTEGER
+                // 必须提供 DEFAULT 值以处理现有数据
+                db.execSQL("ALTER TABLE audio_cache ADD COLUMN bit INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE audio_cache ADD COLUMN sampleRate TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE audio_cache ADD COLUMN bitsPerSample INTEGER NOT NULL DEFAULT 16")
+            }
+        }
         fun getDatabase(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -99,7 +122,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "mzdk_player_database"
                 )
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3,MIGRATION_3_4,MIGRATION_4_5) // 添加迁移
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3,MIGRATION_3_4,MIGRATION_4_5,MIGRATION_5_6,MIGRATION_6_7) // 添加迁移
                     .build()
                 INSTANCE = instance
                 instance

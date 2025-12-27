@@ -11,7 +11,7 @@ gson = "2.13.2"
 converterGson = "3.0.0"
 jaudiotagger = "3.0.1"
 
-kotlin = "2.2.21"
+kotlin = "2.3.0"
 coreKtx = "1.17.0"
 appcompat = "1.7.1"
 composeBom = "2025.12.00"
@@ -36,7 +36,7 @@ activityCompose = "1.12.1"
 datastorePreferences = "1.2.0"
 navigationCompose = "2.9.6"
 ui = "1.10.0"
-ksp = "2.2.21-2.0.4"
+ksp = "2.3.4"
 retrofit = "3.0.0"
 
 [libraries]

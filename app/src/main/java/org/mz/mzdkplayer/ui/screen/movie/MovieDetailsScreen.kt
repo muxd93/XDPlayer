@@ -372,7 +372,7 @@ private fun MovieContent(
                         ) {
                             Column(modifier = Modifier.padding(8.dp)) {
                                 Text(
-                                    text = movie.overview ?: "暂无简介",
+                                    text = movie.overview,
                                     style = MaterialTheme.typography.bodyLarge.copy(
                                         shadow = Shadow(color = Color.Black, blurRadius = 4f)
                                     ),
@@ -449,7 +449,7 @@ private fun MovieContent(
     if (showFullDescDialog) {
         FullDescriptionDialog(
             title = movie.title ?: "",
-            overview = movie.overview ?: "暂无内容",
+            overview = movie.overview,
             onDismiss = { showFullDescDialog = false }
         )
     }

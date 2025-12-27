@@ -97,9 +97,7 @@ fun AlbumCoverDisplay(
     }
 
     // 如果没有提取到颜色，使用默认颜色
-    val finalColors = if (gradientColors.isNotEmpty()) {
-        gradientColors
-    } else {
+    val finalColors = gradientColors.ifEmpty {
         listOf(
             Color(0xFF81ECEC), // 薄荷蓝
             Color(0xFF74B9FF), // 天空蓝

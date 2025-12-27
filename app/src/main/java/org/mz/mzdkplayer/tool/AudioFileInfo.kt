@@ -124,7 +124,8 @@ suspend fun extractAudioInfoAndLyricsFromStream(
                 sampleRate = sampleRate,
                 bitsPerSample = bitsPerSample,
                 lyrics = lyrics,
-                artworkData = artworkData
+                artworkData = artworkData,
+                localCoverPath = ""
             )
 
             Log.d(

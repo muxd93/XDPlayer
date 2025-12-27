@@ -1,7 +1,6 @@
 package org.mz.mzdkplayer.data.local
 
 
-
 import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
@@ -24,23 +23,31 @@ interface AudioDao {
     // 搜索功能 (可选)
     @Query("SELECT * FROM audio_cache WHERE title LIKE '%' || :query || '%' OR artist LIKE '%' || :query || '%'")
     suspend fun searchAudio(query: String): List<AudioCacheEntity>
+
     // 用于回写详细信息
     @Update
     suspend fun updateAudio(audio: AudioCacheEntity)
+
     @Query("DELETE FROM audio_cache")
     suspend fun clearAllAudio()
 
     // 新增：只更新从流中解析出的元数据
-    @Query("""
+    @Query(
+        """
         UPDATE audio_cache 
         SET title = :title, 
             artist = :artist, 
             album = :album, 
             duration = :duration, 
             lyrics = :lyrics, 
-            localCoverPath = :localCoverPath 
+            localCoverPath = :localCoverPath,
+            isDetailsLoaded = :isDetailsLoaded,
+            bit = :bit,
+            sampleRate = :sampleRate,
+            bitsPerSample = :bitsPerSample
         WHERE audioUri = :uri
-    """)
+    """
+    )
     suspend fun updateAudioMetadata(
         uri: String,
         title: String,
@@ -48,6 +55,12 @@ interface AudioDao {
         album: String,
         duration: Long,
         lyrics: String?,
-        localCoverPath: String?
+        localCoverPath: String?,
+        isDetailsLoaded: Boolean,
+        bit: Long? = 0,
+        sampleRate: String? = "",
+        bitsPerSample: Int? = 16,
     )
+
+
 }

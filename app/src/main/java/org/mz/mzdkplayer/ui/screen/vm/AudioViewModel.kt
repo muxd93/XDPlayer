@@ -1,7 +1,6 @@
 package org.mz.mzdkplayer.ui.screen.vm
 
 
-
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -12,6 +11,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import org.mz.mzdkplayer.data.local.AudioCacheEntity
 import org.mz.mzdkplayer.data.local.AudioDao
+import org.mz.mzdkplayer.data.model.AudioInfo
 import org.mz.mzdkplayer.tool.AudioNameParser
 
 class AudioViewModel(
@@ -88,14 +88,16 @@ class AudioViewModel(
             }
         }
     }
+
     /**
      * 回写音频元数据到数据库
      */
     fun updateAudioInfo(
         uri: String,
-        info: org.mz.mzdkplayer.data.model.AudioInfo,
+        info: AudioInfo,
         localCoverPath: String?,
-        duration: Long
+        duration: Long,
+        isDetailsLoaded: Boolean
     ) {
         viewModelScope.launch(Dispatchers.IO) {
             // 防止无效更新
@@ -108,10 +110,18 @@ class AudioViewModel(
                 album = info.album ?: "未知专辑",
                 duration = duration,
                 lyrics = info.lyrics,
-                localCoverPath = localCoverPath
+                localCoverPath = localCoverPath,
+                isDetailsLoaded,
+                bit = info.bit,
+                sampleRate = info.sampleRate,
+                bitsPerSample = info.bitsPerSample,
             )
             Log.d("AudioViewModel", "数据库已更新元数据: $uri")
         }
+    }
+
+    suspend fun getAudioCacheByUri(uri: String): AudioCacheEntity? {
+        return audioDao.getAudioByUri(uri)
     }
 
     fun clearLibrary() {

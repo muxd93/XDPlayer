@@ -1,8 +1,5 @@
 package org.mz.mzdkplayer.ui.audioplayer
-
-import AudioPlayerControls
 import android.graphics.Bitmap
-import android.graphics.BitmapFactory
 import android.util.Log
 import android.view.KeyEvent
 import android.widget.Toast
@@ -11,7 +8,6 @@ import androidx.annotation.OptIn
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.*
@@ -22,21 +18,15 @@ import androidx.compose.ui.AbsoluteAlignment
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.blur
 
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.onFocusChanged
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.TileMode
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
 
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -49,11 +39,7 @@ import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
-import androidx.palette.graphics.Palette
-import androidx.tv.material3.ClickableSurfaceDefaults
 import androidx.tv.material3.MaterialTheme
-import androidx.tv.material3.Surface
-import androidx.tv.material3.SurfaceDefaults
 import androidx.tv.material3.Text
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -159,33 +145,10 @@ fun AudioPlayerScreen(
     }
 
     // 加载音频信息和歌词 - 使用 currentMediaUri 作为依赖项
-    LaunchedEffect(currentMediaUri, audioPlayerViewModel.selectedAtIndex) {
+    LaunchedEffect(currentMediaUri,audioPlayerViewModel.selectedAtIndex) {
         Log.d("AudioPlayerScreen", "Loading audio info for URI: $currentMediaUri")
         isAudioInfoLoading = true
-        val cachedEntity = withContext(Dispatchers.IO) {
-            audioViewModel.getAudioCacheByUri(currentMediaUri)
-        }
-        if (cachedEntity != null && cachedEntity.isDetailsLoaded&& cachedEntity.sampleRate.isNotBlank()) {
-            Log.d("AudioPlayerScreen", "使用数据库缓存元数据")
-            // 将数据库实体转换为 AudioInfo 对象
-            audioInfo = AudioInfo(
-                title = cachedEntity.title,
-                artist = cachedEntity.artist,
-                album = cachedEntity.album,
-                durationSeconds = cachedEntity.duration / 1000, // 注意单位转换
-                lyrics = cachedEntity.lyrics,
-                artworkData = null, // 此时没有字节流
-                localCoverPath = cachedEntity.localCoverPath,
-                bit = cachedEntity.bit,
-                bitsPerSample = cachedEntity.bitsPerSample,
-                sampleRate = cachedEntity.sampleRate
-                // 我们可以在 AudioInfo 里临时存一下这个 path，或者通过其他 State 传递
-            ) // 如果你给 AudioInfo 加了字段的话
-            isAudioInfoLoading = false
-            // 如果已经加载好了，直接跳过后面的流解析逻辑
-            return@LaunchedEffect
-        }
-        // --- 缓存判断结束 --
+
         // 获取当前媒体项的 MIME 类型 - 改进逻辑
         var mimeType: String? = null
 
@@ -215,7 +178,7 @@ fun AudioPlayerScreen(
             retryCount++
         }
 
-        Log.e("sampleMimeType2", currentMediaUri + (mimeType ?: "null"))
+        Log.e("sampleMimeType2", currentMediaUri + (mimeType?.toString() ?: "null"))
 
         // 如果播放器获取失败，使用从扩展名推断的 MIME 类型
         if (mimeType == null) {
@@ -271,10 +234,7 @@ fun AudioPlayerScreen(
                         }
                     }
 
-                Log.d(
-                    "AudioPlayerScreen",
-                    "Opened input stream for $currentMediaUri with MIME: $mimeType"
-                )
+                Log.d("AudioPlayerScreen", "Opened input stream for $currentMediaUri with MIME: $mimeType")
 
                 inputStream?.use { stream ->
                     // 关键：调用工具函数获取 audioInfo，其中包含 lyrics
@@ -291,25 +251,19 @@ fun AudioPlayerScreen(
                         Log.i("AudioPlayerScreen", "开始回写元数据")
                         // 3. 【切换回 Main 线程】获取播放器信息并提交
                         // 2. 【IO线程】耗时操作：保存图片到本地 (这是文件操作，必须在 IO 线程)
-                        val savedCoverPath = saveCoverImageToInternalStorage(
-                            context,
-                            currentMediaUri,
-                            info.artworkData
-                        )
+                        val savedCoverPath = saveCoverImageToInternalStorage(context, currentMediaUri, info.artworkData)
                         withContext(Dispatchers.Main) {
                             Log.i("AudioPlayerScreen", "切回主线程准备回写")
 
                             // 只有在主线程才能安全访问 exoPlayer
-                            val currentDuration =
-                                if (exoPlayer.duration != C.TIME_UNSET) exoPlayer.duration else 0L
+                            val currentDuration = if (exoPlayer.duration != C.TIME_UNSET) exoPlayer.duration else 0L
 
                             // ViewModel 的调用可以在主线程，因为它内部自己会 launch(Dispatchers.IO)
                             audioViewModel.updateAudioInfo(
                                 uri = currentMediaUri,
                                 info = info,
                                 localCoverPath = savedCoverPath,
-                                duration = currentDuration,
-                                isDetailsLoaded = true
+                                duration = currentDuration
                             )
                             Log.i("AudioPlayerScreen", "已触发 ViewModel 回写")
                         }
@@ -494,56 +448,12 @@ fun AudioPlayerScreen(
     }
 
     LaunchedEffect(audioSessionId) {
-        Log.d("audioSessionId", audioSessionId.toString())
+        Log.d("audioSessionId",audioSessionId.toString())
     }
     val pulseState = rememberAudioPlayerPulseState()
     val focusRequester = remember { FocusRequester() }
-    // 1. 处理封面图：使用 remember 缓存 bitmap，避免重组时闪烁
-    // 修改 coverBitmap 的 remember 逻辑
-    // 先获取缓存实体（如果你在 LaunchedEffect 里已经拿到了 cachedEntity，可以把它存成一个 State）
-    val coverBitmap: Bitmap? = remember(audioInfo, currentMediaUri) {
-        val data = audioInfo?.artworkData
-        val path = audioInfo?.localCoverPath
-        Log.d("AudioPlayerScreen",path.toString())
-        if (data != null && data.isNotEmpty()) {
-            // 情况 A: 刚解析出来的字节流数据
-            createArtworkBitmap(data)
-        } else if (!path.isNullOrEmpty()) {
-            // 情况 B: 数据库里存的本地路径
-            BitmapFactory.decodeFile(path)
-        } else {
-            null
-        }
-    }
-
-    // 2. 提取主色调：根据封面生成背景色
-    // (如果没有引入 Palette 库，这里可以用一个固定颜色代替，比如 Color.DarkGray)
-    val dominantColor by remember(coverBitmap) {
-        mutableStateOf(
-            coverBitmap?.let { bitmap ->
-                // 尝试提取主色调，如果没有则默认深灰色
-                Palette.from(bitmap).generate().dominantSwatch?.rgb?.let { Color(it) }
-            } ?: Color(0xFF1C1C1C) // 默认颜色
-        )
-    }
-
-    // 3. 创建动态渐变背景笔刷
-    val backgroundBrush = remember(dominantColor) {
-        Brush.verticalGradient(
-            colors = listOf(
-                dominantColor.copy(alpha = 0.6f), // 上方颜色 (稍亮)
-                Color.Black.copy(alpha = 0.95f)   // 下方颜色 (渐变到黑)
-            ),
-            tileMode = TileMode.Clamp
-        )
-    }
-    val bgStartColor = dominantColor.copy(alpha = 0.6f)
-    val bgEndColor = Color.Black.copy(alpha = 0.95f)
-
-    // 4. 根布局 Box
     Box(
         Modifier
-            // 处理遥控器按键事件 (保留你原有的逻辑)
             .dPadEvents(
                 exoPlayer,
                 audioPlayerState,
@@ -551,214 +461,229 @@ fun AudioPlayerScreen(
                 audioPlayerViewModel,
                 focusRequester
             )
+            .background(Color.Black)
+            .focusable()
             .fillMaxSize()
-    )
-    {
-        // --- 新增：专辑封面模糊背景层 ---
-        Box(modifier = Modifier.fillMaxSize()) {
-            if (coverBitmap != null) {
-                Image(
-                    bitmap = coverBitmap.asImageBitmap(),
-                    contentDescription = null,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .blur(radius = 100.dp), // 设置较大的模糊半径，数值越大越梦幻
-                    contentScale = androidx.compose.ui.layout.ContentScale.Crop
-                )
-            } else {
-                // 如果没封面，显示一个深灰色兜底
-                Box(Modifier.fillMaxSize().background(Color(0xFF1C1C1C)))
-            }
+    ) {
 
-            // 关键：叠加一层半透明黑色的遮罩，确保歌词和控制按钮的对比度
-            // 也可以使用你之前的 backgroundBrush 渐变来做二次叠加
-            Box(
-                Modifier
-                    .fillMaxSize()
-                    .background(
-                        Brush.verticalGradient(
-                            colors = listOf(
-                                Color.Black.copy(alpha = 0.7f), // 顶部稍亮
-                                Color.Black.copy(alpha = 0.75f), // 顶部稍亮
-                                Color.Black.copy(alpha = 0.8f), // 顶部稍亮
-                                Color.Black.copy(alpha = 0.85f), // 顶部稍亮
-                                Color.Black.copy(alpha = 0.9f)  // 底部稍深，保护控件可见度
-                            )
-                        )
-                    )
-            )
-        }
-        // 放在最底层作为氛围装饰
-        if (isPlaying && currentAudioSessionId > 0) {
+
+        // --- 新增：频谱显示 ---
+        // 把它放在最底层（Box的第一个子元素），这样会被文字覆盖，当作动态背景
+        // 或者你可以放在 Row 下面，如果你想让它显示在特定区域
+        if (isPlaying&& currentAudioSessionId > 0) {
+
             AudioVisualizer(
                 audioSessionId = currentAudioSessionId,
                 isPlaying = isPlaying,
                 modifier = Modifier
-                    .align(Alignment.BottomCenter)
+                    .align(Alignment.BottomCenter) // 对齐到底部
                     .fillMaxWidth()
-                    .height(200.dp) // 高度调高一点，做背景
-                    .alpha(0.15f),  // 透明度调低，不要喧宾夺主
+                    .height(60.dp) // 高度限制
+                    .padding(bottom = 0.dp) // 避开底部的控制栏
+                    .alpha(0.3f), // 设置透明度，不要太抢眼
                 barCount = 100,
+               // color = MaterialTheme.colorScheme.primary // 使用主题色
             )
         }
 
-        // --- 内容层：左右分栏布局 (Apple Music 风格) ---
         Row(
             modifier = Modifier
-                .fillMaxSize()
-                .padding(
-                ),
+                .fillMaxSize(),
             verticalAlignment = Alignment.CenterVertically
-        ) {
-            // [左侧栏]：占 40% 宽度，放置封面和文字信息
-            Column(
-                modifier = Modifier
-                    .weight(0.45f)
-                    .fillMaxHeight(),
-                verticalArrangement = Arrangement.Top, // 垂直居中
-                horizontalAlignment = Alignment.Start     // 左对齐
-            )
-            {
-                // 专辑封面容器
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth(0.85f) // 宽度占左栏的 85%
-                        .aspectRatio(1f)     // 强制保持正方形 (1:1)
-                        .padding(bottom = 0.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    // 使用你原本的封面组件
-                    AlbumCoverDisplay(coverBitmap, isPlaying)
-                }
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 20.dp),
-                    horizontalAlignment = Alignment.Start // 确保左对齐
-                ) {
-                    // 歌曲标题
-                    Text(
-                        text = if (isAudioInfoLoading) currentFileName else audioInfo?.title
-                            ?: currentFileName,
-                        style = MaterialTheme.typography.bodyLarge.copy(
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White
-                        ),
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis
-                    )
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    // 歌手和专辑信息
-                    Text(
-                        text = buildString {
-                            append(
-                                if (isAudioInfoLoading) "加载中..." else audioInfo?.artist ?: "未知歌手"
-                            )
-                            if (!audioInfo?.album.isNullOrEmpty()) {
-                                append(" — ${audioInfo?.album}")
-                            }
-                        },
-                        style = MaterialTheme.typography.bodyMedium.copy(
-                            color = Color.White.copy(alpha = 0.7f) //稍微灰一点
-                        ),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    // ✅ 新增：苹果风格音频参数徽章
-                    AudioInfoBadge(audioInfo)
-                    Spacer(modifier = Modifier.height(12.dp))
-                    // --- 浮层：底部控制栏 ---
-                    // 获取安全的时长，避免除以0错误
-                    val safeDurationMs =
-                        if (exoPlayer.duration != C.TIME_UNSET) exoPlayer.duration else 0L
-                    AudioPlayerControls(
-                        isPlaying = isPlaying,
-                        contentCurrentPosition = contentCurrentPosition,
-                        exoPlayer = exoPlayer,
-                        state = audioPlayerState,
-                        audioPlayerViewModel = audioPlayerViewModel,
-                        contentDuration = safeDurationMs.milliseconds
-                    )
-                    // Spacer(modifier = Modifier.height(12.dp))
-
-
-
-                    // 使用我们在 AudioPlayerControls.kt 里改造后的新布局
-
-                }
-
-
-            }
-
-
-            Spacer(modifier = Modifier.width(20.dp)) // 左右栏中间的空隙
-
-            // [右侧栏]：占 60% 宽度，放置滚动歌词
-            Box(
-                modifier = Modifier
-                    .weight(0.6f)
-                    .fillMaxHeight(),
-                contentAlignment = Alignment.TopStart
-            )
-            {
-                // 解析歌词
-                val parsedLyrics = remember(audioInfo?.lyrics) {
-                    if (audioInfo?.lyrics != null) {
-                        parseLrc(audioInfo!!.lyrics)
-                    } else {
-                        emptyList()
+        )
+        {
+            // 优化 1: 使用 remember 来缓存解码后的 Bitmap
+            val coverBitmap: Bitmap? = remember(audioInfo?.artworkData) { // 依赖 artworkData
+                // 当 artworkData 改变时，才重新执行 lambda
+                // 为了性能，也可以考虑在这里直接用 BitmapFactory.decodeByteArray
+                audioInfo?.artworkData?.let { data ->
+                    try {
+                        // 假设 createArtworkBitmap 是一个纯函数，只做解码
+                        // 为了性能，也可以考虑在这里直接用 BitmapFactory.decodeByteArray
+                        createArtworkBitmap(data) // 调用工具函数
+                    } catch (e: Exception) {
+                        Log.e("BitmapCache", "Failed to decode bitmap", e)
+                        null
                     }
                 }
-
-                // 歌词组件 (撑满右侧区域)
-                ScrollableLyricsView(
-                    currentPosition = contentCurrentPosition.milliseconds,
-                    parsedLyrics = parsedLyrics,
-                    topMaskColor =Color.Black.copy(alpha = 0.8f),   // 传入顶部的浅色
-                    bottomMaskColor = Color.Black.copy(alpha = 0.9f)  // 传入底部的深色
-                )
             }
+            // 优化 5: 专辑封面部分
+            Box(
+                modifier = Modifier
+                    .fillMaxHeight(0.5f)
+                    .fillMaxWidth(0.25f)
+                    .offset(x = 56.dp, y = (-38).dp), contentAlignment = Alignment.CenterStart
+            ) { // 使用 wrapContentSize 并居中对齐到末端
+
+                AlbumCoverDisplay(coverBitmap,isPlaying)
+
+            }
+            Column(
+                modifier = Modifier
+                    .fillMaxHeight(0.8f)
+                    .fillMaxWidth(0.75f)
+            ) {
+
+                Box(
+                    modifier = Modifier
+                        .fillMaxHeight(0.18f)
+                        .fillMaxWidth()
+                        .offset(90.dp, y = (-32).dp), contentAlignment = Alignment.CenterStart
+                ) {
+                    Column {
+                        Text(
+                            text = if (isAudioInfoLoading) "加载中..." else audioInfo?.title
+                                ?: "未知标题",
+                            style = MaterialTheme.typography.headlineSmall,
+                            color = Color.White,
+                            maxLines = 1
+                        )
+                        Row(Modifier.padding(top = 8.dp)) {
+                            Text(
+                                text = "艺术家 : ${if (isAudioInfoLoading) "加载中..." else audioInfo?.artist ?: "未知歌手"}",
+                                color = Color.Gray,
+                                fontSize = 16.sp,
+                                maxLines = 1
+                            )
+
+                            Text(text = " · ", color = Color.Gray)
+                            Text(
+                                text = "专辑 : ${if (isAudioInfoLoading) "加载中..." else audioInfo?.album ?: "未知专辑"}",
+                                color = Color.Gray,
+                                fontSize = 16.sp,
+                                maxLines = 1
+                            )
+                        }
+                    }
+                }
+                // 优化 2: 歌词部分 - 使用 audioInfo?.lyrics
+                // 优化 3: 使用 weight(1f) 让歌词部分占据剩余空间
+                Box(
+                    modifier = Modifier
+                        .fillMaxHeight(0.72f)
+                        .fillMaxWidth()
+                        .offset(90.dp, y = (-30).dp), contentAlignment = Alignment.CenterStart
+                ) {
+
+                    // 使用您提供的 LRC 解析器
+                    val parsedLyrics = remember(audioInfo?.lyrics) {
+                        if (audioInfo?.lyrics != null) {
+                            parseLrc(audioInfo!!.lyrics)
+                        } else {
+                            emptyList() // 返回空列表而不是null
+                        }
+                    }
+                    // 优化 4: ScrollableLyricsView 现在会撑满其父 Box
+                    ScrollableLyricsView(
+                        currentPosition = contentCurrentPosition.milliseconds,
+                        parsedLyrics = parsedLyrics
+                    )
+
+
+                }
+            }
+
+
+            // Spacer(Modifier.width(16.dp)) // 添加间距
+
+
         }
 
+        // --- 修复点：安全地处理 duration ---
+        // 确保传递给 UI 组件的 duration 是有效的
+        val safeDurationMs = if (exoPlayer.duration != C.TIME_UNSET) exoPlayer.duration else 0L
+        val safeCurrentPositionMs = contentCurrentPosition
 
-        // --- 浮层：侧边播放列表 (逻辑保持不变) ---
-        AnimatedVisibility(
-            audioPlayerViewModel.atpVisibility,
-            enter = fadeIn(),
-            exit = fadeOut(),
-            modifier = Modifier
-                .width(300.dp)
-                .fillMaxHeight()
-                .align(AbsoluteAlignment.CenterRight)
-                .background(Color.Black.copy(0.95f)) // 背景稍微加深一点
-                .handleDPadKeyEvents(
-                    onRight = { true },
-                    onUp = { true },
-                    onDown = { true },
-                    onLeft = { true }
+        // 控制层叠在底部
+        AudioPlayerOverlay(
+            modifier = Modifier.align(Alignment.BottomCenter) .onFocusChanged {
+                audioPlayerViewModel.conFocus =
+                    it.isFocused
+            }, // 底部居中,
+            state = audioPlayerState,
+            isPlaying = isPlaying,
+            subtitles = { },
+            controls = {
+                AudioPlayerControls(
+                    isPlaying,
+                    safeCurrentPositionMs, // 使用安全的当前位置
+                    exoPlayer,
+                    audioPlayerState,
+                    focusRequester,
+                    currentFileName,
+                    "${audioInfo?.bitsPerSample ?: "--"} bit - " +
+                            "${
+                                audioInfo?.sampleRate?.let {
+                                    String.format(
+                                        Locale.getDefault(),
+                                        "%.1f kHz",
+                                        it.toInt() / 1000.0
+                                    )
+                                } ?: "未知采样率"
+                            } - " +
+                            "${audioInfo?.bit ?: "--"} Kbps",
+
+                    "时长: ${
+                        if (safeDurationMs != 0L) {
+                            formatDuration(safeDurationMs.toInt())
+                        } else {
+                            "--:--"
+                        }
+                    }", // 直接使用 exoPlayer.duration 格式化后的字符串
+                    audioPlayerViewModel,
+                    safeDurationMs.milliseconds // 传递安全的 Duration
                 )
+            },
+            atpFocus = audioPlayerViewModel.atpFocus
+        )
+        // 在频谱显示组件中
+
+        // 音乐列表
+        AnimatedVisibility(
+            audioPlayerViewModel.atpVisibility, // 根据 ViewModel 状态显示/隐藏
+            enter = fadeIn(), // 淡入动画
+            exit = fadeOut(), // 淡出动画
+            modifier = Modifier
+                .widthIn(200.dp, 360.dp) // 宽度范围
+                .fillMaxHeight() // 高度范围
+                .align(AbsoluteAlignment.CenterRight) // 右侧居中
+                // 向左偏移
+                .background(
+                    Color.Black.copy(0.8f), shape = RoundedCornerShape(2.dp) // 半透明黑色背景和圆角
+                )
+                // ✅ 关键修复：阻止事件冒泡到父组件
+                .handleDPadKeyEvents(
+                    onRight = { true },  // 消耗事件
+                    onUp = { true },     // 消耗事件
+                    onDown = { true },   // 消耗事件
+                    onLeft = { true }    // ✅ 关键：向左按键在面板内消耗，不传递到控制栏
+                )
+                // 处理焦点变化
                 .onFocusChanged { focusState ->
+                    // 隐藏控制栏
                     audioPlayerViewModel.atpFocus = focusState.isFocused
-                }
-        ) {
+
+//                    // ✅ 关键：当面板失去焦点且不可见时，将焦点返回到控制栏
+//                    if (!focusState.isFocused && !audioPlayerViewModel.atpVisibility) {
+//                        focusRequester.requestFocus()
+//                    }
+                }) {
+            // 根据 ViewModel 中的选择显示不同的面板
             when (audioPlayerViewModel.selectedAorVorS) {
                 "L" -> AudioListPanel(
-                    audioPlayerViewModel.selectedAtIndex,
-                    onSelectedIndexChange = { audioPlayerViewModel.selectedAtIndex = it },
-                    extraList.toMutableList(),
+                    audioPlayerViewModel.selectedAtIndex, // 当前选中的音频轨道索引
+                    onSelectedIndexChange = {
+                        audioPlayerViewModel.selectedAtIndex = it
+                    }, // 索引变化回调
+                    extraList.toMutableList(), // 音频轨道组
                     exoPlayer,
                     audioPlayerViewModel
+
                 )
             }
-            // 列表显示时的返回键拦截
             BackHandler(true) {
                 audioPlayerViewModel.atpVisibility = false
-                audioPlayerViewModel.atpFocus = false
+                audioPlayerViewModel.atpFocus = false // 隐藏时重置焦点状态
                 focusRequester.requestFocus()
             }
         }
@@ -852,33 +777,5 @@ fun formatDuration(durationMs: Int?): String {
 }
 
 
-// ✅ 新增：苹果风格音频参数徽章组件
-@Composable
-fun AudioInfoBadge(audioInfo: org.mz.mzdkplayer.data.model.AudioInfo?) {
-    // 格式化文本：16 BIT · 44.1 KHZ · 850 KBPS
-    val sampleRateValue = audioInfo?.sampleRate?.toIntOrNull()
-    val infoText = "${audioInfo?.bitsPerSample ?: "--"} BIT · ${
-        sampleRateValue?.let {
-            Locale.getDefault().let { locale ->
-                // 只有成功转换成数字了才进行除法和格式化
-                String.format(locale, "%.1f KHZ", it / 1000.0)
-            }
-        } ?: "--"
-    } · ${audioInfo?.bit ?: "--"} KBPS"
 
-    Surface(
-        colors = SurfaceDefaults.colors(
-            Color.White.copy(alpha = 0.95f),
-            contentColor = Color.Black
-        ), // 白底
-        shape = RoundedCornerShape(4.dp),
-    ) {
-        Text(
-            text = infoText,
-            color = Color.Black, // 黑字
-            fontSize = 11.sp,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-        )
-    }
-}
+

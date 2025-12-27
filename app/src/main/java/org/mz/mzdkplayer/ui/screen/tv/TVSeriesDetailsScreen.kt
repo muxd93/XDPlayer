@@ -325,7 +325,7 @@ private fun TVSeriesContent(
                             modifier = Modifier.offset(x = (-8).dp)
                         ) {
                             Text(
-                                text = "${tvSeries.name} S${currentSeason}·E${currentEpisode}" ?: "未知剧集",
+                                text = "${tvSeries.name} S${currentSeason}·E${currentEpisode}",
                                 style = MaterialTheme.typography.displaySmall.copy(
                                     shadow = Shadow(
                                         color = Color.Black.copy(alpha = 0.8f),

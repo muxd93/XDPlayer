@@ -27,7 +27,7 @@ import androidx.tv.material3.Text
 @Composable
 fun AudioPlayerControllerText(text: String) {
     Text(
-        modifier = Modifier.padding(horizontal = 12.dp),
+        modifier = Modifier.padding(horizontal = 1.dp),
         text = text,
         color = Color.White,
         fontWeight = FontWeight.SemiBold

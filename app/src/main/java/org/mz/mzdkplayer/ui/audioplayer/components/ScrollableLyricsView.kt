@@ -44,7 +44,12 @@ import kotlin.time.Duration
  */
 @SuppressLint("UnrememberedMutableState")
 @Composable
-fun ScrollableLyricsView(currentPosition: Duration, parsedLyrics: List<LyricEntry>) {
+fun ScrollableLyricsView(
+    currentPosition: Duration,
+    parsedLyrics: List<LyricEntry>,
+    topMaskColor: Color,    // 对应背景的起始色
+    bottomMaskColor: Color  // 对应背景的结束色
+) {
     val lazyListState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
     val density = LocalDensity.current
@@ -66,7 +71,8 @@ fun ScrollableLyricsView(currentPosition: Duration, parsedLyrics: List<LyricEntr
             coroutineScope.launch {
                 // 尝试计算使目标项大致居中的偏移量
                 val avgItemHeightPx = 60 // 启发式估计，可根据实际UI调整
-                val viewportHeightPx = lazyListState.layoutInfo.viewportEndOffset - lazyListState.layoutInfo.viewportStartOffset
+                val viewportHeightPx =
+                    lazyListState.layoutInfo.viewportEndOffset - lazyListState.layoutInfo.viewportStartOffset
                 val estimatedCenterOffset = (viewportHeightPx / 2) - (avgItemHeightPx / 2)
 
                 // animateScrollToItem 第二个参数是相对于该项顶部的偏移量
@@ -75,23 +81,24 @@ fun ScrollableLyricsView(currentPosition: Duration, parsedLyrics: List<LyricEntr
         }
     }
 
-    // 定义自然过渡效果的渐变色 - 适配黑色背景
-    val blurHeight = 25.dp
+    val blurHeight = 10.dp // 增加一点高度，效果更自然
+    // 顶部遮罩：从背景顶部的颜色渐变到透明
     val topGradient = Brush.verticalGradient(
         colors = listOf(
-            Color.Black.copy(alpha = 0.8f),           // 深色开始
-            Color.Black.copy(alpha = 0.4f),           // 中间透明度
-            Color.Transparent                         // 结束透明
+            topMaskColor, // 直接从传入的颜色开始
+            topMaskColor.copy(alpha = 0.5f),
+            Color.Transparent
         ),
         startY = 0f,
         endY = with(density) { blurHeight.toPx() }
     )
 
+    // 底部遮罩：从透明渐变到背景底部的颜色
     val bottomGradient = Brush.verticalGradient(
         colors = listOf(
-            Color.Transparent,                       // 开始透明
-            Color.Black.copy(alpha = 0.4f),           // 中间透明度
-            Color.Black.copy(alpha = 0.8f)            // 深色结束
+            Color.Transparent,
+            bottomMaskColor.copy(alpha = 0.6f),
+            bottomMaskColor // 结束于深黑
         ),
         startY = 0f,
         endY = with(density) { blurHeight.toPx() }
@@ -124,12 +131,14 @@ fun ScrollableLyricsView(currentPosition: Duration, parsedLyrics: List<LyricEntr
                 modifier = Modifier
                     .fillMaxSize(), // 移除了 padding，让内容填满整个区域
                 verticalArrangement = Arrangement.spacedBy(8.dp), // 行间距
-                horizontalAlignment = Alignment.Start
+                horizontalAlignment = Alignment.Start,
+               // contentPadding = PaddingValues(vertical = blurHeight),
             ) {
                 itemsIndexed(parsedLyrics) { index, entry ->
+                    val isHighlighted = index == highlightedIndex
                     // 为字体大小添加动画
                     val fontSize by animateFloatAsState(
-                        targetValue = if (index == highlightedIndex) 20f else 16f,
+                        targetValue = if (isHighlighted) 20f else 16f,
                         animationSpec = tween(durationMillis = 300),
                         label = "fontSize"
                     )
@@ -137,13 +146,13 @@ fun ScrollableLyricsView(currentPosition: Duration, parsedLyrics: List<LyricEntr
                     Text(
                         text = entry.text.ifEmpty { "..." },
                         fontSize = fontSize.sp,
-                        fontWeight = if (index == highlightedIndex) FontWeight.Bold else FontWeight.Normal,
-                        color = if (index == highlightedIndex) Color.White else Color.Gray,
+                        fontWeight = if (isHighlighted) FontWeight.Bold else FontWeight.Normal,
+                        color = if (isHighlighted) Color.White else Color.White.copy(alpha = 0.4f),
                         textAlign = TextAlign.Start,
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 0.dp, vertical = 4.dp)
-                            .alpha(if (index == highlightedIndex) 1f else 0.7f)
+                            .alpha(if (isHighlighted) 1f else 0.6f)
                     )
                 }
             }
