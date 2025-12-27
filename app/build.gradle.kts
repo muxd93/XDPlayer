@@ -92,6 +92,8 @@ dependencies {
     implementation(libs.gson)
     implementation(libs.coil3.coil.compose)
     implementation(libs.coil.network.okhttp)
+
+    //implementation("io.coil-kt:coil-transformations:3.3.0")
     implementation(libs.retrofit)
     implementation(libs.converter.gson)
     // 分页

@@ -19,6 +19,7 @@ import kotlinx.coroutines.launch
 import kotlin.math.hypot
 import kotlin.math.ln
 import kotlin.math.log10
+import kotlin.math.pow
 
 
 @Composable
@@ -71,7 +72,7 @@ fun AudioVisualizer(
             // 1. 改进采样索引：Android FFT 前几位是极低频，跳过第0位(直流分量)
             // 使用幂函数曲线采样，让低频占比例缩小，高频占比例增大
             val fraction = i.toFloat() / barCount
-            val index = (Math.pow(fraction.toDouble(), 1.5) * (n - 2)).toInt().coerceIn(1, n - 1)
+            val index = (fraction.toDouble().pow(1.5) * (n - 2)).toInt().coerceIn(1, n - 1)
 
             val r = data[index * 2].toFloat()
             val img = data[index * 2 + 1].toFloat()
@@ -79,7 +80,7 @@ fun AudioVisualizer(
 
             // 2. 核心改进：指数级增益补偿 (Boost)
             // i 越往右（高频），补偿系数越大。Math.pow 让右侧补偿呈指数上升
-            val multiplier = 1.0f + Math.pow(fraction.toDouble(), 2.0).toFloat() * 15f
+            val multiplier = 1.0f + fraction.toDouble().pow(2.0).toFloat() * 15f
 
             // 3. 计算目标高度，并加入一个微小的随机基础高度，防止死掉
             var targetHeight = (magnitude * multiplier * (size.height / 100f))

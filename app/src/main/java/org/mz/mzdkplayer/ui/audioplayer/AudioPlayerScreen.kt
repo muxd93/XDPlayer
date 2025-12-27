@@ -8,12 +8,13 @@ import android.view.KeyEvent
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.annotation.OptIn
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.foundation.Image
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
-import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 
@@ -22,14 +23,10 @@ import androidx.compose.ui.AbsoluteAlignment
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.blur
-
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.TileMode
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
@@ -50,11 +47,13 @@ import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.palette.graphics.Palette
-import androidx.tv.material3.ClickableSurfaceDefaults
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Surface
 import androidx.tv.material3.SurfaceDefaults
 import androidx.tv.material3.Text
+import coil3.compose.AsyncImage
+import coil3.request.ImageRequest
+import coil3.request.crossfade
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
@@ -498,47 +497,20 @@ fun AudioPlayerScreen(
     }
     val pulseState = rememberAudioPlayerPulseState()
     val focusRequester = remember { FocusRequester() }
-    // 1. 处理封面图：使用 remember 缓存 bitmap，避免重组时闪烁
-    // 修改 coverBitmap 的 remember 逻辑
-    // 先获取缓存实体（如果你在 LaunchedEffect 里已经拿到了 cachedEntity，可以把它存成一个 State）
+
+    // 1. 处理封面图（前景小图）：使用 remember 缓存 bitmap
     val coverBitmap: Bitmap? = remember(audioInfo, currentMediaUri) {
         val data = audioInfo?.artworkData
         val path = audioInfo?.localCoverPath
         Log.d("AudioPlayerScreen",path.toString())
         if (data != null && data.isNotEmpty()) {
-            // 情况 A: 刚解析出来的字节流数据
             createArtworkBitmap(data)
         } else if (!path.isNullOrEmpty()) {
-            // 情况 B: 数据库里存的本地路径
             BitmapFactory.decodeFile(path)
         } else {
             null
         }
     }
-
-    // 2. 提取主色调：根据封面生成背景色
-    // (如果没有引入 Palette 库，这里可以用一个固定颜色代替，比如 Color.DarkGray)
-    val dominantColor by remember(coverBitmap) {
-        mutableStateOf(
-            coverBitmap?.let { bitmap ->
-                // 尝试提取主色调，如果没有则默认深灰色
-                Palette.from(bitmap).generate().dominantSwatch?.rgb?.let { Color(it) }
-            } ?: Color(0xFF1C1C1C) // 默认颜色
-        )
-    }
-
-    // 3. 创建动态渐变背景笔刷
-    val backgroundBrush = remember(dominantColor) {
-        Brush.verticalGradient(
-            colors = listOf(
-                dominantColor.copy(alpha = 0.6f), // 上方颜色 (稍亮)
-                Color.Black.copy(alpha = 0.95f)   // 下方颜色 (渐变到黑)
-            ),
-            tileMode = TileMode.Clamp
-        )
-    }
-    val bgStartColor = dominantColor.copy(alpha = 0.6f)
-    val bgEndColor = Color.Black.copy(alpha = 0.95f)
 
     // 4. 根布局 Box
     Box(
@@ -554,41 +526,79 @@ fun AudioPlayerScreen(
             .fillMaxSize()
     )
     {
-        // --- 新增：专辑封面模糊背景层 ---
-        Box(modifier = Modifier.fillMaxSize()) {
-            if (coverBitmap != null) {
-                Image(
-                    bitmap = coverBitmap.asImageBitmap(),
-                    contentDescription = null,
+        // --- 背景层：使用 Coil 3 + AnimatedContent 替换原有的 Blur ---
+        AnimatedContent(
+            targetState = audioInfo, // 当音频信息变化时触发背景切换
+            transitionSpec = {
+                fadeIn(animationSpec = tween(700)) togetherWith fadeOut(animationSpec = tween(700))
+            },
+            label = "BackgroundAnimation",
+            modifier = Modifier.fillMaxSize()
+        ) { info ->
+            Box(modifier = Modifier.fillMaxSize()) {
+                // 优先使用本地路径，其次使用字节数组
+                val model = info?.localCoverPath?.ifEmpty { null } ?: info?.artworkData
+
+                if (model != null) {
+                    AsyncImage(
+                        model = ImageRequest.Builder(LocalContext.current)
+                            .data(model)
+                            .crossfade(true)
+                            .build(),
+                        contentDescription = null,
+                        contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize(),
+                        alpha = 0.6f // 稍微降低原图亮度
+                    )
+                } else {
+                    // 兜底深色背景
+                    Box(modifier = Modifier.fillMaxSize().background(Color(0xFF1C1C1C)))
+                }
+
+                // === 渐变遮罩层 (关键修改) ===
+                // 1. 全局深色压暗：保证整体文字可读性，不需要像电影界面那么亮
+                Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .blur(radius = 100.dp), // 设置较大的模糊半径，数值越大越梦幻
-                    contentScale = androidx.compose.ui.layout.ContentScale.Crop
+                        .background(Color.Black.copy(alpha = 0.5f))
                 )
-            } else {
-                // 如果没封面，显示一个深灰色兜底
-                Box(Modifier.fillMaxSize().background(Color(0xFF1C1C1C)))
-            }
 
-            // 关键：叠加一层半透明黑色的遮罩，确保歌词和控制按钮的对比度
-            // 也可以使用你之前的 backgroundBrush 渐变来做二次叠加
-            Box(
-                Modifier
-                    .fillMaxSize()
-                    .background(
-                        Brush.verticalGradient(
-                            colors = listOf(
-                                Color.Black.copy(alpha = 0.7f), // 顶部稍亮
-                                Color.Black.copy(alpha = 0.75f), // 顶部稍亮
-                                Color.Black.copy(alpha = 0.8f), // 顶部稍亮
-                                Color.Black.copy(alpha = 0.85f), // 顶部稍亮
-                                Color.Black.copy(alpha = 0.9f)  // 底部稍深，保护控件可见度
+                // 2. 垂直渐变：底部加深 (保护控制按钮区域)
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(
+                            Brush.verticalGradient(
+                                colors = listOf(
+                                    Color.Transparent,
+                                    Color.Black.copy(alpha = 0.6f),
+                                    Color.Black.copy(alpha = 0.95f)
+                                ),
+                                startY = 300f // 从中间开始往下渐变
                             )
                         )
-                    )
-            )
+                )
+
+                // 3. 水平渐变：右侧加深 (保护滚动歌词区域)
+                // 歌词通常是白色的，背景需要足够暗
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(
+                            Brush.horizontalGradient(
+                                colors = listOf(
+                                    Color.Transparent, // 左侧保持背景图可见度较高
+                                    Color.Black.copy(alpha = 0.5f),
+                                    Color.Black.copy(alpha = 0.8f) // 右侧歌词区域加深
+                                ),
+                                startX = 400f // 从中间偏左开始向右渐变
+                            )
+                        )
+                )
+            }
         }
-        // 放在最底层作为氛围装饰
+
+        // 放在最底层作为氛围装饰 (保持不变)
         if (isPlaying && currentAudioSessionId > 0) {
             AudioVisualizer(
                 audioSessionId = currentAudioSessionId,
@@ -627,7 +637,7 @@ fun AudioPlayerScreen(
                         .padding(bottom = 0.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    // 使用你原本的封面组件
+                    // 使用你原本的封面组件 (前景小图依然使用 Bitmap)
                     AlbumCoverDisplay(coverBitmap, isPlaying)
                 }
                 Column(
@@ -701,7 +711,7 @@ fun AudioPlayerScreen(
             // [右侧栏]：占 60% 宽度，放置滚动歌词
             Box(
                 modifier = Modifier
-                    .weight(0.6f)
+                    .weight(0.6f).padding(end = 20.dp)
                     .fillMaxHeight(),
                 contentAlignment = Alignment.TopStart
             )
@@ -719,8 +729,8 @@ fun AudioPlayerScreen(
                 ScrollableLyricsView(
                     currentPosition = contentCurrentPosition.milliseconds,
                     parsedLyrics = parsedLyrics,
-                    topMaskColor =Color.Black.copy(alpha = 0.8f),   // 传入顶部的浅色
-                    bottomMaskColor = Color.Black.copy(alpha = 0.9f)  // 传入底部的深色
+                    topMaskColor =Color.Black.copy(alpha = 0.6f),   // 调整顶部遮罩颜色
+                    bottomMaskColor = Color.Black.copy(alpha = 0.9f)  // 调整底部遮罩颜色
                 )
             }
         }
