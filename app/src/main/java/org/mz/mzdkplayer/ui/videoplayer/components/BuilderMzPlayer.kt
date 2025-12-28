@@ -29,6 +29,7 @@ import androidx.media3.exoplayer.DefaultRenderersFactory.EXTENSION_RENDERER_MODE
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.exoplayer.trackselection.DefaultTrackSelector
+import androidx.media3.exoplayer.upstream.DefaultAllocator
 import androidx.media3.extractor.DefaultExtractorsFactory
 import androidx.media3.extractor.Extractor
 import androidx.media3.extractor.ExtractorsFactory
@@ -256,15 +257,29 @@ fun rememberPlayer(
         // 目标：将缓冲内存加大至 500MB，并设置更激进的缓冲时长。
         // 预估：80GB / 2小时 ≈ 11.1 MB/s (平均码率)
         // 50秒缓冲所需内存 ≈ 50 * 11.1 MB/s ≈ 555 MB
+        val targetBufferBytes = 180 * 1024 * 1024
+
         val optimizedLoadControl = DefaultLoadControl.Builder()
-//            .setBufferDurationsMs(
-//                50_000, // 最小缓冲 50 秒 (Min Buffer)
-//                75_000, // 最大缓冲 75 秒 (Max Buffer) - 增加裕量应对高码率峰值
-//                1_500,  // 起播缓冲 3 秒 (Buffer for Playback)
-//                5_000   // Rebuffer后缓冲 5 秒 (Buffer after Rebuffer)
-//            )
-            .setPrioritizeTimeOverSizeThresholds(true) // 优先保证时间长度，忽略默认的内部大小限制
-            .setBackBuffer(5000, true) // 回退缓冲 5 秒，并且允许回退播放 (用于快速 Seek 后退)
+            // 关键点 1: 手动设置分配器，通常保持默认即可，但显式声明有助于理解
+            .setAllocator(DefaultAllocator(true, C.DEFAULT_BUFFER_SEGMENT_SIZE))
+
+            // 关键点 2: 设置缓冲内存的大小限制
+            // 如果不设置这个，关掉 PrioritizeTimeOverSize 后，4K 视频缓存几秒就会停止，导致卡顿
+            .setTargetBufferBytes(targetBufferBytes)
+
+            .setBufferDurationsMs(
+                30_000, // Min Buffer: 最小缓冲 30 秒 (让 SMB 有足够时间应对网络抖动)
+                50_000, // Max Buffer: 最大缓冲 50 秒 (到了 50 秒或者 128MB 就会停止，防止 OOM)
+                2_500,  // Playback Start: 起播缓冲 2.5 秒 (太高起播慢，太低容易起播即卡)
+                5_000   // Rebuffer: 卡顿后重新缓冲 5 秒再播
+            )
+
+            // 关键点 3: 听你的，设为 false。
+            // 这意味着：只要 "时长达到 Max" 或者 "大小达到 targetBufferBytes"，就停止缓冲。
+            // 这样就绝对不会无限请求导致 OOM。
+            .setPrioritizeTimeOverSizeThresholds(false)
+
+            .setBackBuffer(5000, true) // 回退缓冲保持 5 秒
             .build()
         Log.e("enableTunneling", "isSetting ${settingsState.enableTunneling}")
         // --- 3. 配置 TrackSelector 并设置 Tunneling ---
@@ -314,7 +329,7 @@ fun rememberPlayer(
         ExoPlayer.Builder(context).setSeekForwardIncrementMs(30000).setSeekBackIncrementMs(30000)
             .setTrackSelector(trackSelector).setMediaSourceFactory(
                 mediaSource
-            )
+            ).setLoadControl(optimizedLoadControl)
             .setRenderersFactory(renderersFactory).build().apply {
                 playWhenReady = true
                 repeatMode = Player.REPEAT_MODE_ONE

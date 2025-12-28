@@ -9,7 +9,7 @@
  * - Targeted for TV/Landscape resolution (960x540 dp).
  */
 
-package org.mz.mzdkplayer.tool
+package org.mz.mzdkplayer.ui.screen.setting
 
 import androidx.compose.ui.tooling.preview.Preview
 
@@ -252,7 +252,7 @@ fun updateRayPhysics(
 
     // --- Physics Calculation ---
     // We want the light to curve.
-    // In GR, the "force" effectively effectively creates an orbit at 1.5 * Rs (Photon Sphere).
+    // In GR, the "force" effectively creates an orbit at 1.5 * Rs (Photon Sphere).
     // The centripetal acceleration needed for orbit is a = v^2 / r.
     // Here v = c, r = 1.5 * Rs.
     // So needed Force/Mass (Acceleration) Magnitude at 1.5Rs is: Acc = c^2 / (1.5 * Rs).

@@ -123,7 +123,7 @@ fun rememberAudioPlayer(context: Context, mediaUri: String, dataSourceType: Stri
         // 根据 URI 协议选择合适的数据源工厂
         val dataSourceFactory = if (mediaUri.startsWith("smb://") && dataSourceType == "SMB") {
             // SMB 协议 1 * 1024 * 1024防止卡顿
-            SmbDataSourceFactory(SmbDataSourceConfig(bufferSizeBytes = 1 * 1024 * 1024, smbBufferSizeBytes = 1 * 1024 * 1024))
+            SmbDataSourceFactory(SmbDataSourceConfig(bufferSizeBytes = 1 * 1024 * 1024, socketBufferSizeBytes = 1 * 1024 * 1024))
         } else if ((mediaUri.startsWith("file://") || mediaUri.startsWith("/")) && dataSourceType == "LOCAL") {
             // 本地文件协议或绝对路径
             DefaultDataSource.Factory(context)
