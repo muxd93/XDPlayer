@@ -15,6 +15,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.height
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.key
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -82,7 +84,7 @@ fun SubtitleView(
         VideoDisplayRect(videoSizeDp.width.toFloat(), videoSizeDp.height.toFloat(), 0f, 0f)
     }
 
-    Log.i("SubtitleView", "Video container: ${videoSizeDp.width}x${videoSizeDp.height}")
+    Log.i("SubtitleView", "Video container: ${videoSizeDp.width}x${videoSizeDp.height}cueGroup.cues.size ${cueGroup.cues.size}")
     Log.i("SubtitleView", "Video source: ${videoSourceWidth}x${videoSourceHeight}")
     Log.i("SubtitleView", "Displayed video: ${displayedVideoRect.widthDp}x${displayedVideoRect.heightDp} at (${displayedVideoRect.offsetXDp}, ${displayedVideoRect.offsetYDp})")
 
@@ -152,108 +154,111 @@ fun SubtitleView(
             }
         }
 // === 位图字幕 ===
+        // === 位图字幕优化版 ===
         Box(modifier = Modifier.fillMaxSize()) {
             cueGroup.cues.forEachIndexed { index, cue ->
-                cue.bitmap?.let { bitmap ->
-                    // >>> 强制居中逻辑：覆盖 position/line/anchor
-                    // 替换从这里开始
-                    val anchorInfo = if (forcePGSCenter) {
-                        SubtitleAnchorInfo(
-                            x = 0.5f,
-                            y = 0.90f,
-                            positionAnchor = Cue.ANCHOR_TYPE_MIDDLE,
-                            lineAnchor = Cue.ANCHOR_TYPE_START
-                        )
-                    } else {
-                        val resolvedX = if (cue.position != Cue.DIMEN_UNSET) cue.position.coerceIn(0f, 1f) else 0.5f
-                        val resolvedY = if (cue.line != Cue.DIMEN_UNSET) cue.line.coerceIn(0f, 1f) else 0.5f
-                        SubtitleAnchorInfo(
-                            x = resolvedX,
-                            y = resolvedY,
-                            positionAnchor = cue.positionAnchor,
-                            lineAnchor = cue.lineAnchor
-                        )
-                    }
+                // 使用 key 确保在多条字幕同时存在时，Compose 能追踪到每一个具体的 Box。
+                // 如果 cue 有唯一 ID 最好，没有的话我们组合 index 和 bitmap 哈希值。
+                val cueKey = remember(cue) { "${index}_${cue.bitmap?.hashCode() ?: 0}" }
 
-                    val (x, y, positionAnchor, lineAnchor) = anchorInfo
+                key(cueKey) {
+                    cue.bitmap?.let { bitmap ->
+                        // 1. 预先处理位图：避免在每一帧绘制时重复执行转换逻辑
+                        val imageBitmap = remember(bitmap) { bitmap.asImageBitmap() }
 
-                    val originalBitmapAspectRatio = bitmap.width.toFloat() / bitmap.height.toFloat()
-
-                    val targetWidthDp = if (!forcePGSCenter && cue.size != Cue.DIMEN_UNSET) {
-                        displayedVideoRect.widthDp * cue.size
-                    } else {
-                        bitmap.width / density
-                    }
-
-                    val targetHeightDp = if (!forcePGSCenter && cue.bitmapHeight != Cue.DIMEN_UNSET) {
-                        displayedVideoRect.heightDp * cue.bitmapHeight
-                    } else {
-                        bitmap.height / density
-                    }
-
-                    // 尺寸计算逻辑保持不变
-                    val (bitmapWidthDp, bitmapHeightDp) = when {
-                        !forcePGSCenter && cue.size != Cue.DIMEN_UNSET && cue.bitmapHeight != Cue.DIMEN_UNSET -> {
-                            val widthBasedHeight = targetWidthDp / originalBitmapAspectRatio
-                            val heightBasedWidth = targetHeightDp * originalBitmapAspectRatio
-                            if (widthBasedHeight <= targetHeightDp) {
-                                targetWidthDp to widthBasedHeight
+                        // 2. 锚点逻辑处理
+                        val anchorInfo = remember(cue, forcePGSCenter) {
+                            if (forcePGSCenter) {
+                                SubtitleAnchorInfo(
+                                    x = 0.5f,
+                                    y = 0.90f,
+                                    positionAnchor = Cue.ANCHOR_TYPE_MIDDLE,
+                                    lineAnchor = Cue.ANCHOR_TYPE_START
+                                )
                             } else {
-                                heightBasedWidth to targetHeightDp
+                                val resolvedX = if (cue.position != Cue.DIMEN_UNSET) cue.position.coerceIn(0f, 1f) else 0.5f
+                                val resolvedY = if (cue.line != Cue.DIMEN_UNSET) cue.line.coerceIn(0f, 1f) else 0.5f
+                                SubtitleAnchorInfo(
+                                    x = resolvedX,
+                                    y = resolvedY,
+                                    positionAnchor = cue.positionAnchor,
+                                    lineAnchor = cue.lineAnchor
+                                )
                             }
                         }
 
-                        !forcePGSCenter && cue.size != Cue.DIMEN_UNSET -> {
-                            targetWidthDp to (targetWidthDp / originalBitmapAspectRatio)
+                        val (x, y, positionAnchor, lineAnchor) = anchorInfo
+                        val originalBitmapAspectRatio = bitmap.width.toFloat() / bitmap.height.toFloat()
+
+                        // 3. 尺寸计算
+                        val (bitmapWidthDp, bitmapHeightDp) = remember(cue, displayedVideoRect, forcePGSCenter) {
+                            val targetW = if (!forcePGSCenter && cue.size != Cue.DIMEN_UNSET) {
+                                displayedVideoRect.widthDp * cue.size
+                            } else {
+                                bitmap.width / density
+                            }
+
+                            val targetH = if (!forcePGSCenter && cue.bitmapHeight != Cue.DIMEN_UNSET) {
+                                displayedVideoRect.heightDp * cue.bitmapHeight
+                            } else {
+                                bitmap.height / density
+                            }
+
+                            when {
+                                !forcePGSCenter && cue.size != Cue.DIMEN_UNSET && cue.bitmapHeight != Cue.DIMEN_UNSET -> {
+                                    val widthBasedHeight = targetW / originalBitmapAspectRatio
+                                    val heightBasedWidth = targetH * originalBitmapAspectRatio
+                                    if (widthBasedHeight <= targetH) targetW to widthBasedHeight else heightBasedWidth to targetH
+                                }
+                                !forcePGSCenter && cue.size != Cue.DIMEN_UNSET -> targetW to (targetW / originalBitmapAspectRatio)
+                                !forcePGSCenter && cue.bitmapHeight != Cue.DIMEN_UNSET -> (targetH * originalBitmapAspectRatio) to targetH
+                                else -> (bitmap.width / density) to (bitmap.height / density)
+                            }
                         }
 
-                        !forcePGSCenter && cue.bitmapHeight != Cue.DIMEN_UNSET -> {
-                            (targetHeightDp * originalBitmapAspectRatio) to targetHeightDp
+                        // 4. 偏移量计算
+                        val contentOffsetX = when (positionAnchor) {
+                            Cue.ANCHOR_TYPE_START -> displayedVideoRect.widthDp * x
+                            Cue.ANCHOR_TYPE_MIDDLE -> displayedVideoRect.widthDp * x - bitmapWidthDp / 2
+                            Cue.ANCHOR_TYPE_END -> displayedVideoRect.widthDp * x - bitmapWidthDp
+                            else -> displayedVideoRect.widthDp * x
                         }
 
-                        else -> {
-                            (bitmap.width / density) to (bitmap.height / density)
+                        val contentOffsetY = when (lineAnchor) {
+                            Cue.ANCHOR_TYPE_START -> displayedVideoRect.heightDp * y
+                            Cue.ANCHOR_TYPE_MIDDLE -> displayedVideoRect.heightDp * y - bitmapHeightDp / 2
+                            Cue.ANCHOR_TYPE_END -> displayedVideoRect.heightDp * y - bitmapHeightDp
+                            else -> displayedVideoRect.heightDp * y
                         }
-                    }
 
-                    // 使用覆盖后的 anchor 计算偏移
-                    val contentOffsetX = when (positionAnchor) {
-                        Cue.ANCHOR_TYPE_START -> displayedVideoRect.widthDp * x
-                        Cue.ANCHOR_TYPE_MIDDLE -> displayedVideoRect.widthDp * x - bitmapWidthDp / 2
-                        Cue.ANCHOR_TYPE_END -> displayedVideoRect.widthDp * x - bitmapWidthDp
-                        else -> displayedVideoRect.widthDp * x
-                    }
+                        val finalOffsetX = displayedVideoRect.offsetXDp + contentOffsetX
+                        val finalOffsetY = displayedVideoRect.offsetYDp + contentOffsetY
 
-                    val contentOffsetY = when (lineAnchor) {
-                        Cue.ANCHOR_TYPE_START -> displayedVideoRect.heightDp * y
-                        Cue.ANCHOR_TYPE_MIDDLE -> displayedVideoRect.heightDp * y - bitmapHeightDp / 2
-                        Cue.ANCHOR_TYPE_END -> displayedVideoRect.heightDp * y - bitmapHeightDp
-                        else -> displayedVideoRect.heightDp * y
-                    }
+                        // 5. 动态 ZIndex 修正，防止同一帧内多条字幕层级冲突
+                        val effectiveZIndex = cue.zIndex.toFloat() + (index * 0.01f)
 
-                    val finalOffsetX = displayedVideoRect.offsetXDp + contentOffsetX
-                    val finalOffsetY = displayedVideoRect.offsetYDp + contentOffsetY
-                    Log.i("SubtitleView", "zindex${cue.zIndex}")
-                    val effectiveZIndex = cue.zIndex.toFloat() + (index * 0.01f)
-                    Box(
-                        modifier = Modifier
-                            .offset(x = finalOffsetX.dp, y = finalOffsetY.dp)
-                            .width(bitmapWidthDp.dp)
-                            .height(bitmapHeightDp.dp)
-                            .zIndex(effectiveZIndex)
-                    ) {
-                        Canvas(modifier = Modifier.fillMaxSize()) {
-                            val dstWidthPx = (bitmapWidthDp * density).toInt()
-                            val dstHeightPx = (bitmapHeightDp * density).toInt()
-                            drawImage(
-                                image = bitmap.asImageBitmap(),
-                                srcOffset = IntOffset.Zero,
-                                srcSize = IntSize(bitmap.width, bitmap.height),
-                                dstOffset = IntOffset.Zero,
-                                dstSize = IntSize(dstWidthPx, dstHeightPx),
-                                alpha = 1.0f,
-                                blendMode = DefaultBlendMode
-                            )
+                        Box(
+                            modifier = Modifier
+                                .offset(x = finalOffsetX.dp, y = finalOffsetY.dp)
+                                .width(bitmapWidthDp.dp)
+                                .height(bitmapHeightDp.dp)
+                                .zIndex(effectiveZIndex)
+                        ) {
+                            Canvas(modifier = Modifier.fillMaxSize()) {
+                                val dstWidthPx = (bitmapWidthDp * density).toInt()
+                                val dstHeightPx = (bitmapHeightDp * density).toInt()
+
+                                // 直接使用缓存好的 imageBitmap
+                                drawImage(
+                                    image = imageBitmap,
+                                    srcOffset = IntOffset.Zero,
+                                    srcSize = IntSize(bitmap.width, bitmap.height),
+                                    dstOffset = IntOffset.Zero,
+                                    dstSize = IntSize(dstWidthPx, dstHeightPx),
+                                    alpha = 1.0f,
+                                    blendMode = DefaultBlendMode
+                                )
+                            }
                         }
                     }
                 }

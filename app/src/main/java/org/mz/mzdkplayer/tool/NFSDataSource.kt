@@ -54,7 +54,7 @@ class NFSDataSource : BaseDataSource(/* isNetwork= */ true) {
     // --- 配置参数 ---
     companion object {
         private const val TAG = "NFSDataSource"
-        private const val DEFAULT_BUFFER_SIZE_BYTES = 8 * 1024 * 1024 // 8MB 默认缓冲区大小
+        private const val DEFAULT_BUFFER_SIZE_BYTES = 2 * 1024 * 1024 // 8MB 默认缓冲区大小
         private const val MAX_RETRY_COUNT = 3 // NFS 客户端最大重试次数
     }
 

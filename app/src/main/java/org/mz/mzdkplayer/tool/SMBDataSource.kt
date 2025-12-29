@@ -55,19 +55,19 @@ class SmbDataSource(
         fun releaseGlobalResources() {
             Log.i(TAG, "Releasing GLOBAL SMB resources...")
             try {
-                cachedShare?.close()
-                cachedSession?.close()
-                cachedConnection?.close()
-            } catch (e: Exception) {
-                Log.w(TAG, "Error releasing global resources", e)
-            } finally {
                 cachedShare = null
                 cachedSession = null
                 cachedConnection = null
                 currentHost = null
+                sharedSmbClient = null
+            } catch (e: Exception) {
+                Log.w(TAG, "Error releasing global resources", e)
+            } finally {
+
                 // sharedSmbClient 通常可以保留复用，如果需要彻底重置可解开下面注释
-                // sharedSmbClient = null
+
             }
+            Log.i(TAG, "Releasing GLOBAL SMB END...")
         }
     }
 
@@ -303,7 +303,7 @@ data class SmbDataSourceConfig(
     // 应用层流缓冲区：建议 512KB (512 * 1024)。
     // 这个值决定了 BufferedInputStream 一次从网络预取多少数据。
     // 太小(如8KB)会导致IO频繁，太大(如8MB)会导致首屏加载慢且容易OOM。
-    val bufferSizeBytes: Int = 1 * 1024 * 1024,
+    val bufferSizeBytes: Int = 2 * 1024 * 1024,
 
     // Socket 层缓冲区 (SmbConfig.bufferSize)：建议 1MB - 4MB。
     // 这决定了底层 TCP 接收窗口的大小，对吞吐量影响很大。

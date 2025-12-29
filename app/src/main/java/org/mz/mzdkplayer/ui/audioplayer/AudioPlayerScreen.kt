@@ -1,12 +1,16 @@
 package org.mz.mzdkplayer.ui.audioplayer
 
 import AudioPlayerControls
+import android.Manifest
+import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.util.Log
 import android.view.KeyEvent
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.OptIn
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
@@ -37,6 +41,7 @@ import androidx.compose.ui.text.style.TextOverflow
 
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.media3.common.C
@@ -156,7 +161,32 @@ fun AudioPlayerScreen(
             exoPlayer.release()
         }
     }
+// 1. 状态：是否有录音权限
+    var hasAudioPermission by remember {
+        mutableStateOf(
+            ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.RECORD_AUDIO
+            ) == PackageManager.PERMISSION_GRANTED
+        )
+    }
 
+    // 2. 权限启动器
+    val launcher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        hasAudioPermission = isGranted
+        if (!isGranted) {
+            Toast.makeText(context, "没有录音权限，将无法显示频谱动画", Toast.LENGTH_LONG).show()
+        }
+    }
+
+    // 3. 进入页面时自动检查并申请
+    LaunchedEffect(Unit) {
+        if (!hasAudioPermission) {
+            launcher.launch(Manifest.permission.RECORD_AUDIO)
+        }
+    }
     // 加载音频信息和歌词 - 使用 currentMediaUri 作为依赖项
     LaunchedEffect(currentMediaUri, audioPlayerViewModel.selectedAtIndex) {
         Log.d("AudioPlayerScreen", "Loading audio info for URI: $currentMediaUri")
@@ -595,7 +625,7 @@ fun AudioPlayerScreen(
         }
 
         // 放在最底层作为氛围装饰 (保持不变)
-        if (isPlaying && currentAudioSessionId > 0) {
+        if (isPlaying && currentAudioSessionId > 0&& hasAudioPermission) {
             AudioVisualizer(
                 audioSessionId = currentAudioSessionId,
                 isPlaying = true,

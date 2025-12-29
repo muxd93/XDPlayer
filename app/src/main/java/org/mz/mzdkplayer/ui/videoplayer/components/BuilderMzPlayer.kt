@@ -329,7 +329,7 @@ fun rememberPlayer(
         ExoPlayer.Builder(context).setSeekForwardIncrementMs(30000).setSeekBackIncrementMs(30000)
             .setTrackSelector(trackSelector).setMediaSourceFactory(
                 mediaSource
-            ).setLoadControl(optimizedLoadControl)
+            )
             .setRenderersFactory(renderersFactory).build().apply {
                 playWhenReady = true
                 repeatMode = Player.REPEAT_MODE_ONE

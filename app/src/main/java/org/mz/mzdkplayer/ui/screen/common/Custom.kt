@@ -50,7 +50,7 @@ import androidx.tv.material3.ShapeDefaults
 import androidx.tv.material3.Surface
 
 import androidx.tv.material3.Text
-import org.mz.mzdkplayer.ui.theme.MyIconButtonColor
+import org.mz.mzdkplayer.ui.theme.myIconButtonColor
 
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
@@ -190,7 +190,7 @@ fun MyIconButton(
         contentPadding = if (isFileBut) buttonWithIconContentPadding else ButtonDefaults.ButtonWithIconContentPadding,
         shape = ButtonDefaults.shape(shape = ShapeDefaults.ExtraSmall),
         scale = ButtonDefaults.scale(focusedScale = 1.03f),
-        colors = MyIconButtonColor()
+        colors = myIconButtonColor()
 
     ) {
         Icon(

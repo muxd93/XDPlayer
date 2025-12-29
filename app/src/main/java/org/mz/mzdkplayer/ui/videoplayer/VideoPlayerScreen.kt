@@ -35,6 +35,7 @@ import androidx.compose.ui.AbsoluteAlignment
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
@@ -62,6 +63,8 @@ import androidx.media3.common.util.Log
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
+import androidx.tv.material3.Button
+import androidx.tv.material3.ButtonDefaults
 
 import androidx.tv.material3.Text
 import com.kuaishou.akdanmaku.DanmakuConfig
@@ -91,6 +94,7 @@ import org.mz.mzdkplayer.ui.screen.vm.MediaHistoryViewModel
 import org.mz.mzdkplayer.ui.screen.vm.SettingsViewModel
 import org.mz.mzdkplayer.ui.screen.vm.VideoPlayerStatus
 import org.mz.mzdkplayer.ui.screen.vm.VideoPlayerViewModel
+import org.mz.mzdkplayer.ui.theme.myIconButtonColor
 import org.mz.mzdkplayer.ui.videoplayer.components.AkDanmakuPlayer
 import org.mz.mzdkplayer.ui.videoplayer.components.AudioTrackPanel
 import org.mz.mzdkplayer.ui.videoplayer.components.BuilderMzPlayer
@@ -113,6 +117,7 @@ import java.io.IOException
 import java.io.InputStream
 import java.net.URL
 import java.util.Locale
+import kotlin.concurrent.thread
 import kotlin.time.Duration.Companion.milliseconds
 
 /**
@@ -179,6 +184,15 @@ fun VideoPlayerScreen(
 
     // 从 SettingsViewModel 中获取字幕相关的状态
     val settingsState by settingsViewModel.uiState.collectAsState()
+    // 1. 在 VideoPlayerScreen 开头定义一个变量记录历史进度
+    var pendingSeekPosition by remember { mutableLongStateOf(-1L) }
+
+    // 记录从数据库查到的历史进度
+    var historySeekPos by remember { mutableLongStateOf(0L) }
+    // 控制跳转提示条的显示
+    var showHistoryTip by remember { mutableStateOf(false) }
+    // 增加一个标记，确保只在第一次准备好时触发计时
+    var hasTriggeredTimer by remember { mutableStateOf(false) }
 
     // 构建播放器 (设置媒体源等)
     BuilderMzPlayer(context, mediaUri, exoPlayer, dataSourceType,settingsViewModel)
@@ -216,18 +230,24 @@ fun VideoPlayerScreen(
             // ⭐️ 新增：退出播放页面时，彻底关闭 SMB 连接
             // 只有在这里调用，才能既保证播放时的连接复用，又保证退出时不泄露连接
             // 统一释放所有协议的全局连接
-            SmbDataSource.releaseGlobalResources()
-            WebDavDataSource.releaseGlobalResources()
-            FtpDataSource.releaseGlobalResources()
+            thread {
+                try {
+                    SmbDataSource.releaseGlobalResources()
+                    WebDavDataSource.releaseGlobalResources()
+                    FtpDataSource.releaseGlobalResources()
+                } catch (e: Exception) {
+                    android.util.Log.e("VideoPlayer", "Async release failed", e)
+                }
+            }
         }
     }
     LaunchedEffect(Unit) {
         // 调用 suspend 函数从数据库获取进度
         val historyPosition = mediaHistoryViewModel.getHistoryPosition(mediaUri)
 
-        // 如果有记录且大于0，则跳转
-        if (historyPosition > 0) {
-            exoPlayer.seekTo(historyPosition)
+        // 进度大于 5 秒才有必要提示跳转（避开片头）
+        if (historyPosition > 5000) {
+            historySeekPos = historyPosition
         }
     }
 
@@ -458,6 +478,12 @@ fun VideoPlayerScreen(
                 when (playbackState) {
                     Player.STATE_READY -> {
                         videoPlayerViewModel.updatePlayerStatus(VideoPlayerStatus.READY)
+                        // ✨ 核心改进：当视频真正准备好播放时，如果存在历史记录且还没触发过提示
+                        if (historySeekPos > 0 && !hasTriggeredTimer) {
+                            exoPlayer.seekTo(historySeekPos)
+                            showHistoryTip = true
+                            hasTriggeredTimer = true // 确保不会因为暂停/播放反复弹出
+                        }
                     }
 
                     Player.STATE_BUFFERING -> {
@@ -493,6 +519,7 @@ fun VideoPlayerScreen(
             }
         })
     }
+    // 专门负责提示框的自动倒计时消失
 
     // 主 UI 布局 - 保持 PlayerView 作为底层渲染，状态覆盖层在上层
     Box(
@@ -512,6 +539,7 @@ fun VideoPlayerScreen(
 
         // 创建焦点请求器
         val focusRequester = remember { FocusRequester() }
+        val reRequester = remember { FocusRequester() }
         var videoSizePx by remember { mutableStateOf(IntSize.Zero) }
         val density = LocalDensity.current.density
 
@@ -521,7 +549,22 @@ fun VideoPlayerScreen(
                 height = (videoSizePx.height / density).toInt()
             )
         }
+        // 在 VideoPlayerScreen.kt 中修改或添加以下 LaunchedEffect
+        LaunchedEffect(showHistoryTip) {
+            if (showHistoryTip) {
+                // 给一点点时间让 AnimatedVisibility 把内容挂载到树上
+                delay(100)
+                try {
+                    reRequester.requestFocus()
+                } catch (e: Exception) {
+                    Log.e("VideoPlayer", "Focus request failed", e)
+                }
 
+                // 原有的 5 秒后自动消失逻辑
+                delay(5000)
+                showHistoryTip = false
+            }
+        }
 
         // AndroidView 包裹 PlayerView，用于显示视频 - 这是关键，确保底层渲染不受干扰
         AndroidView(
@@ -617,7 +660,34 @@ fun VideoPlayerScreen(
             },
             atpFocus = videoPlayerViewModel.atpFocus // 音轨/字幕面板焦点状态
         )
+        LaunchedEffect(Unit) {
+            reRequester.requestFocus()
+        }
+        // 历史记录跳转提示浮窗
+        AnimatedVisibility(
+            visible = showHistoryTip,
+            modifier = Modifier
+                .align(Alignment.BottomStart)
+                .padding(start = 40.dp, bottom = 150.dp) // 避开进度条位置
+        ) {
+            Button(
+                modifier = Modifier.focusRequester(reRequester),
+                onClick = {
+                    exoPlayer.seekTo(0L)
+                    reRequester.freeFocus()
+                    showHistoryTip = false
 
+                },
+                colors = myIconButtonColor()
+            ) {
+                val minutes = (historySeekPos / 1000 / 60).toString().padStart(2, '0')
+                val seconds = (historySeekPos / 1000 % 60).toString().padStart(2, '0')
+                Text(
+                    text = "您上次看到 $minutes:$seconds 点击此处从头播放",
+                    fontSize = 14.sp
+                )
+            }
+        }
         // 显示 "再按一次退出" Toast
         if (showToast) {
 

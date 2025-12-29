@@ -29,7 +29,7 @@ private val FocusedContent = Color(80, 70, 60)          // 暖深灰
 private val FocusedSelectedBackground = Color(255, 240, 200, 255) // 米黄色/淡金色
 private val FocusedSelectedContent = Color(80, 70, 60)         // 暖深灰
 @Composable
-fun MyIconButtonColor(): ButtonColors{
+fun myIconButtonColor(): ButtonColors{
     return ButtonDefaults.colors(
         containerColor = Color(0xFF2D2D2D), // 保持默认或根据需要调整
         contentColor = Color(255, 248, 240), // 暖白色替代默认
