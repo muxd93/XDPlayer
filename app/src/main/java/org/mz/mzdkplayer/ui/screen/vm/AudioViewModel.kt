@@ -78,7 +78,7 @@ class AudioViewModel(
                 audioDao.insertAll(newEntities)
 
                 Log.d("AudioViewModel", "扫描完成，新增入库: ${newEntities.size} 首")
-
+                _isScanning.value = false
             } catch (e: Exception) {
                 Log.e("AudioViewModel", "扫描出错", e)
             } finally {

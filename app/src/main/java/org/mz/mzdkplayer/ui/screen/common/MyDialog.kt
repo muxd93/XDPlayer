@@ -94,7 +94,6 @@ fun MyFileDialog(
                     onClick = {
                         if (allowClick) {
                             onEditClick()
-                            Toast.makeText(context, "点击修改", Toast.LENGTH_SHORT).show()
                         }
                     }
                 )
@@ -117,7 +116,6 @@ fun MyFileDialog(
                     onClick = {
                         if (allowClick) {
                             onCloseClick()
-                            Toast.makeText(context, "点击删除", Toast.LENGTH_SHORT).show()
                         }
                     }
                 )

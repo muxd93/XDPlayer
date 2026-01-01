@@ -37,7 +37,11 @@ import org.mz.mzdkplayer.data.model.FileConnectionStatus
 import org.mz.mzdkplayer.tool.Tools
 import org.mz.mzdkplayer.tool.Tools.VideoBigIcon
 import org.mz.mzdkplayer.ui.screen.common.FileEmptyScreen
+import org.mz.mzdkplayer.ui.screen.common.FileIcon
+import org.mz.mzdkplayer.ui.screen.common.FileName
+import org.mz.mzdkplayer.ui.screen.common.FileSize
 import org.mz.mzdkplayer.ui.screen.common.LoadingScreen
+import org.mz.mzdkplayer.ui.screen.common.MediaFocusedFileName
 import org.mz.mzdkplayer.ui.screen.common.VAErrorScreen
 import org.mz.mzdkplayer.ui.screen.vm.FTPConViewModel
 
@@ -327,24 +331,14 @@ fun FTPFileListScreen(
                                             ),
                                             leadingContent = {
                                                 val fileExtension = Tools.extractFileExtension(file.name)
-                                                Icon(
-                                                    painter = when {
-                                                        file.isDirectory -> painterResource(R.drawable.baseline_folder_24)
-                                                        Tools.containsVideoFormat(fileExtension) -> painterResource(R.drawable.moviefileicon)
-                                                        Tools.containsAudioFormat(fileExtension) -> painterResource(R.drawable.baseline_music_note_24)
-                                                        Tools.containsImageFileExtension(fileExtension) -> painterResource(R.drawable.image24dp)
-                                                        else -> painterResource(R.drawable.baseline_insert_drive_file_24)
-                                                    },
-                                                    contentDescription = null,
-                                                )
+                                                FileIcon(isDirectory,fileExtension)
                                             },
                                             headlineContent = {
-                                                Text(
-                                                    file.name,
-                                                    maxLines = 1,
-                                                    overflow = TextOverflow.Ellipsis,
-                                                    fontSize = 10.sp
-                                                )
+                                                FileName(fileName)
+                                            },
+                                            trailingContent = {
+                                                // 只有文件才显示大小，目录可以留空或显示项数
+                                                FileSize(file.isDirectory,file.size)
                                             }
                                         )
                                     }
@@ -373,15 +367,7 @@ fun FTPFileListScreen(
                                     .height(200.dp)
                                     .fillMaxWidth()
                             )
-                            focusedFileName?.let {
-                                Text(
-                                    it,
-                                    color = Color.White,
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 18.sp,
-                                    modifier = Modifier.padding(start = 8.dp)
-                                )
-                            }
+                            MediaFocusedFileName(focusedFileName)
                         }
                     }
                 }

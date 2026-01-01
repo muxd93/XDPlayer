@@ -184,7 +184,7 @@ class HTTPLinkConViewModel : ViewModel() {
         }
 
         val responseBody = response.body?.string()
-        if (responseBody == null || responseBody.isEmpty()) {
+        if (responseBody.isNullOrEmpty()) {
             Log.w("HTTPLinkConViewModel", "Empty response body for URL: $url")
             return emptyList()
         }
@@ -194,32 +194,41 @@ class HTTPLinkConViewModel : ViewModel() {
 
     private fun parseHtmlDirectoryListing(html: String, baseUrl: String): List<HTTPLinkResource> {
         val resources = mutableListOf<HTTPLinkResource>()
-        val linkPattern = Pattern.compile(
-            "<a\\s+[^>]*href\\s*=\\s*[\"']([^\"']*)[\"'][^>]*>([^<]*)</a>",
+
+        // 改进后的正则：捕获链接 href、链接文字 以及 标签后面的文本（包含日期和大小）
+        // 这个正则会匹配 <a>...</a> 后面直到下一个 < 的所有内容
+        val rowPattern = Pattern.compile(
+            "<a\\s+[^>]*href\\s*=\\s*[\"']([^\"']*)[\"'][^>]*>([^<]*)</a>([^<]*)",
             Pattern.CASE_INSENSITIVE or Pattern.DOTALL
         )
-        val matcher = linkPattern.matcher(html)
+        val matcher = rowPattern.matcher(html)
 
         while (matcher.find()) {
-            var href = matcher.group(1)
+            var href = matcher.group(1) ?: continue
             href = URLDecoder.decode(href, StandardCharsets.UTF_8.name())
 
-            if (href != null && !href.startsWith("#") && !href.startsWith("javascript:") && !href.startsWith("mailto:")) {
+            // 提取 <a> 标签后的文本内容
+            val afterText = matcher.group(3) ?: ""
+
+            if (!href.startsWith("#") && !href.startsWith("javascript:")) {
                 val fullHref = resolveUrl(href, baseUrl)
                 if (isSubPathOf(fullHref, baseUrl)) {
                     val isDirectory = href.endsWith("/")
                     val cleanHref = href.trimEnd('/')
                     val name = cleanHref.substringAfterLast("/", cleanHref)
-                    val finalName = name.trimEnd('/')
 
-                    // 注意：现在 path 字段可以存 href（或 relative path），但 UI 可能不需要
-                    if (finalName != ".." && finalName != ".") {
-                        resources.add(HTTPLinkResource(finalName, isDirectory, href))
+                    if (name != ".." && name != ".") {
+                        // --- 提取文件大小逻辑 ---
+                        var size: Long = 0
+                        if (!isDirectory) {
+                            size = parseNginxSize(afterText)
+                        }
+
+                        resources.add(HTTPLinkResource(name, isDirectory, href, size))
                     }
                 }
             }
         }
-
         return resources.distinctBy { it.name }
     }
 
@@ -249,9 +258,28 @@ class HTTPLinkConViewModel : ViewModel() {
         }
     }
 }
-
+/**
+ * 辅助方法：从 Nginx 的行文本中提取大小数字
+ */
+private fun parseNginxSize(text: String): Long {
+    return try {
+        // Nginx 的格式通常是:  Date Time  Size
+        // 我们寻找末尾的数字部分
+        val parts = text.trim().split(Regex("\\s+"))
+        if (parts.isNotEmpty()) {
+            val lastPart = parts.last()
+            // 如果是目录，Nginx 显示 "-"，如果是文件显示字节数
+            if (lastPart == "-") 0L else lastPart.toLong()
+        } else {
+            0L
+        }
+    } catch (e: Exception) {
+        0L
+    }
+}
 data class HTTPLinkResource(
     val name: String,
     val isDirectory: Boolean,
-    val path: String // 这里可以是 href 值，如 "movie.mp4" 或 "subdir/"
+    val path: String ,// 这里可以是 href 值，如 "movie.mp4" 或 "subdir/"
+    val fileSize : Long = 1L
 )

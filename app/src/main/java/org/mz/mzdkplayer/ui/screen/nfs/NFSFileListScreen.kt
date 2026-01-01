@@ -37,7 +37,11 @@ import org.mz.mzdkplayer.data.model.NFSConnection
 import org.mz.mzdkplayer.tool.Tools
 import org.mz.mzdkplayer.tool.Tools.VideoBigIcon
 import org.mz.mzdkplayer.ui.screen.common.FileEmptyScreen
+import org.mz.mzdkplayer.ui.screen.common.FileIcon
+import org.mz.mzdkplayer.ui.screen.common.FileName
+import org.mz.mzdkplayer.ui.screen.common.FileSize
 import org.mz.mzdkplayer.ui.screen.common.LoadingScreen
+import org.mz.mzdkplayer.ui.screen.common.MediaFocusedFileName
 import org.mz.mzdkplayer.ui.screen.vm.NFSConViewModel
 import org.mz.mzdkplayer.ui.theme.MyFileListItemColor
 
@@ -85,7 +89,7 @@ fun NFSFileListScreen(
             is FileConnectionStatus.Connected -> {
 
                 // 已连接，可以安全地列出文件
-                //Log.d("NFSFileListScreen", "Already connected, listing files for subPath: $subPath")
+                Log.d("NFSFileListScreen", "已连接")
                 Log.d("sharePath", sharePath)
                 viewModel.listFiles(sharePath)
             }
@@ -93,7 +97,7 @@ fun NFSFileListScreen(
             is FileConnectionStatus.Disconnected -> {
                 delay(300)
                 // 未连接，尝试连接
-                Log.d("NFSFileListScreen", "Disconnected. Attempting to connect.")
+                Log.d("NFSFileListScreen", "未连接")
                 Log.d("sharePath", sharePath)
                 viewModel.connectToNFS(
                     nfsConnection
@@ -102,7 +106,7 @@ fun NFSFileListScreen(
 
             is FileConnectionStatus.Connecting -> {
                 // 正在连接，等待...
-                Log.d("NFSFileListScreen", "Connecting...")
+                Log.d("NFSFileListScreen", "正在连接...")
                 isLoading = true
             }
 
@@ -114,13 +118,13 @@ fun NFSFileListScreen(
             }
 
             is FileConnectionStatus.LoadingFile -> {
-                Log.d("SMBFileListScreen", "正在加载文件...")
-                isLoading = true
+                Log.d("NFSFileListScreen", "正在加载文件...")
+               // isLoading = true
             }
 
             is FileConnectionStatus.FilesLoaded -> {
-                Log.d("SMBFileListScreen", "文件加载完成")
-                isLoading = false
+                Log.d("NFSFileListScreen", "文件加载完成")
+              //  isLoading = false
 
             }
         }
@@ -129,7 +133,7 @@ fun NFSFileListScreen(
     DisposableEffect(Unit) {
         onDispose {
             // 可选：在离开屏幕时断开连接或清理资源
-            // viewModel.disconnectNFS()
+            viewModel.disconnectNfs()
             Log.d("NFSFileListScreen", "销毁")
         }
     }
@@ -141,13 +145,6 @@ fun NFSFileListScreen(
             .padding(16.dp)
     ) {
         when (connectionStatus) {
-            is FileConnectionStatus.Connecting -> {
-//                LoadingScreen(
-//                    "正在连接NFS服务器", Modifier
-//                        .fillMaxSize()
-//                        .background(Color.Black)
-//                )
-            }
 
             is FileConnectionStatus.Error -> {
                 // 显示错误信息
@@ -162,19 +159,11 @@ fun NFSFileListScreen(
                 // 可以添加一个重试按钮
             }
 
-            is FileConnectionStatus.Connected ,is FileConnectionStatus.FilesLoaded-> {
-                if (fileList.isEmpty()&& !isLoading) {
+            is FileConnectionStatus.FilesLoaded-> {
+                if (fileList.isEmpty()) {
                     FileEmptyScreen("此目录为空")
-                    return@Box
-                }
-                if (isLoading) {
-                    LoadingScreen(
-                        "正在加载NFS文件",
-                        Modifier
-                            .fillMaxSize()
-                            .background(Color.Black)
-                    )
-                } else  {
+
+                }else{
                     // 已连接，显示文件列表
                     Row(Modifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically) {
                         LazyColumn(
@@ -219,7 +208,12 @@ fun NFSFileListScreen(
                                                             nfsConnection.shareName,
                                                             "UTF-8"
                                                         )
-                                                    }/$encodedNewSubPath/${URLEncoder.encode(nfsConnection.name,"UTF-8")}"
+                                                    }/$encodedNewSubPath/${
+                                                        URLEncoder.encode(
+                                                            nfsConnection.name,
+                                                            "UTF-8"
+                                                        )
+                                                    }"
                                                 )
                                             } else {
                                                 // 处理文件点击 - 导航到 VideoPlayer
@@ -262,24 +256,42 @@ fun NFSFileListScreen(
                                                                 file.name,
                                                                 "UTF-8"
                                                             )
-                                                        }/${ URLEncoder.encode(
-                                                            nfsConnection.name,
-                                                            "UTF-8"
-                                                        )}"
+                                                        }/${
+                                                            URLEncoder.encode(
+                                                                nfsConnection.name,
+                                                                "UTF-8"
+                                                            )
+                                                        }"
                                                     )
-                                                } else if (Tools.containsAudioFormat(Tools.extractFileExtension(file.name))) {
+                                                } else if (Tools.containsAudioFormat(
+                                                        Tools.extractFileExtension(
+                                                            file.name
+                                                        )
+                                                    )
+                                                ) {
                                                     // ✅ 构建音频文件列表
                                                     val audioFiles = fileList.filter { nfsFile ->
-                                                        Tools.containsAudioFormat(Tools.extractFileExtension(nfsFile.name))
+                                                        Tools.containsAudioFormat(
+                                                            Tools.extractFileExtension(
+                                                                nfsFile.name
+                                                            )
+                                                        )
                                                     }
 
                                                     // ✅ 构建文件名到索引的映射（O(N) 一次构建）
-                                                    val nameToIndexMap = audioFiles.withIndex().associateBy({ it.value.name }, { it.index })
+                                                    val nameToIndexMap = audioFiles.withIndex()
+                                                        .associateBy(
+                                                            { it.value.name },
+                                                            { it.index })
 
                                                     // ✅ 快速查找索引（O(1)）
-                                                    val currentAudioIndex = nameToIndexMap[file.name] ?: -1
+                                                    val currentAudioIndex =
+                                                        nameToIndexMap[file.name] ?: -1
                                                     if (currentAudioIndex == -1) {
-                                                        Log.e("FTPFileListScreen", "未找到文件在音频列表中: ${file.name}")
+                                                        Log.e(
+                                                            "FTPFileListScreen",
+                                                            "未找到文件在音频列表中: ${file.name}"
+                                                        )
                                                         return@launch
 
                                                     }
@@ -287,39 +299,50 @@ fun NFSFileListScreen(
                                                     // ✅ 构建播放列表
                                                     val audioItems = audioFiles.map { nfsFile ->
                                                         AudioItem(
-                                                            uri = "nfs://${nfsConnection.serverAddress}:${nfsConnection.shareName}:${nfsFile.path}" ,
+                                                            uri = "nfs://${nfsConnection.serverAddress}:${nfsConnection.shareName}:${nfsFile.path}",
                                                             fileName = nfsFile.name,
                                                             dataSourceType = "HTTP"
                                                         )
                                                     }
                                                     // 设置数据
                                                     MzDkPlayerApplication.clearStringList("audio_playlist")
-                                                    MzDkPlayerApplication.setStringList("audio_playlist", audioItems)
+                                                    MzDkPlayerApplication.setStringList(
+                                                        "audio_playlist",
+                                                        audioItems
+                                                    )
                                                     navController.navigate(
                                                         "AudioPlayer/$encodedFileUrl/NFS/${
                                                             URLEncoder.encode(
                                                                 file.name,
                                                                 "UTF-8"
                                                             )
-                                                        }/${ URLEncoder.encode(
-                                                            nfsConnection.name,
-                                                            "UTF-8"
-                                                        )}/$currentAudioIndex"
+                                                        }/${
+                                                            URLEncoder.encode(
+                                                                nfsConnection.name,
+                                                                "UTF-8"
+                                                            )
+                                                        }/$currentAudioIndex"
                                                     )
-                                                } else if (Tools.containsImageFileExtension(Tools.extractFileExtension(file.name))) {
+                                                } else if (Tools.containsImageFileExtension(
+                                                        Tools.extractFileExtension(
+                                                            file.name
+                                                        )
+                                                    )
+                                                ) {
                                                     navController.navigate(
                                                         "PicViewer/$encodedFileUrl/NFS/${
                                                             URLEncoder.encode(
                                                                 file.name,
                                                                 "UTF-8"
                                                             )
-                                                        }/${ URLEncoder.encode(
-                                                            nfsConnection.name,
-                                                            "UTF-8"
-                                                        )}"
+                                                        }/${
+                                                            URLEncoder.encode(
+                                                                nfsConnection.name,
+                                                                "UTF-8"
+                                                            )
+                                                        }"
                                                     )
-                                                }else
-                                                {
+                                                } else {
                                                     Toast.makeText(
                                                         context,
                                                         "不支持的格式",
@@ -348,24 +371,15 @@ fun NFSFileListScreen(
                                     ),
                                     leadingContent = {
                                         val fileExtension = Tools.extractFileExtension(file.name)
-                                        Icon(
-                                            painter = when {
-                                                file.isDirectory -> painterResource(R.drawable.baseline_folder_24)
-                                                Tools.containsVideoFormat(fileExtension) -> painterResource(R.drawable.moviefileicon)
-                                                Tools.containsAudioFormat(fileExtension) -> painterResource(R.drawable.baseline_music_note_24)
-                                                Tools.containsImageFileExtension(fileExtension) -> painterResource(R.drawable.image24dp)
-                                                else -> painterResource(R.drawable.baseline_insert_drive_file_24)
-                                            },
-                                            contentDescription = null,
-                                        )
+                                        FileIcon(isDirectory,fileExtension)
                                     },
                                     headlineContent = {
-                                        Text(
-                                            file.name, maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis, fontSize = 10.sp
-                                        )
+                                        FileName(fileName)
+                                    },
+                                    trailingContent = {
+                                        // 只有文件才显示大小，目录可以留空或显示项数
+                                        FileSize(file.isDirectory, file.length())
                                     }
-                                    // supportingContent = { Text(file.rawListing ?: "") } // 可以显示原始信息
                                 )
                             }
                         }
@@ -383,32 +397,11 @@ fun NFSFileListScreen(
                                     .height(200.dp)
                                     .fillMaxWidth()
                             )
-                            focusedFileName?.let {
-                                Text(
-                                    it,
-                                    color = Color.White,
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 18.sp,
-                                    modifier = Modifier.padding(start = 8.dp)
-                                )
-                            }
+                            MediaFocusedFileName(focusedFileName)
                         }
-                    }
-                }
+                    }   }
             }
-
-            is FileConnectionStatus.Disconnected -> {
-                // 显示未连接提示
-                Column(
-                    modifier = Modifier.align(Alignment.Center),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Text("未连接到 NFS 服务器")
-                    // 可以添加一个按钮来触发连接
-                }
-            }
-
-            FileConnectionStatus.LoadingFile -> {
+            else  -> {
                 LoadingScreen(
                     "正在加载NFS文件",
                     Modifier
@@ -416,8 +409,6 @@ fun NFSFileListScreen(
                         .background(Color.Black)
                 )
             }
-
-
         }
     }
 }

@@ -1,6 +1,6 @@
 package org.mz.mzdkplayer.ui.screen.smbfile
 
-import MediaInfoExtractorFormFileName
+import org.mz.mzdkplayer.tool.MediaInfoExtractorFormFileName
 import NoSearchResult
 import android.util.Log
 import android.widget.Toast
@@ -11,13 +11,11 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -41,16 +39,12 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.navigation.NavHostController
-import androidx.tv.material3.Icon
 import androidx.tv.material3.ListItem
 import androidx.tv.material3.ListItemDefaults
 import androidx.tv.material3.Text
@@ -64,14 +58,20 @@ import org.mz.mzdkplayer.data.repository.Resource
 import org.mz.mzdkplayer.di.RepositoryProvider
 import org.mz.mzdkplayer.tool.Tools
 import org.mz.mzdkplayer.tool.Tools.VideoBigIcon
-import org.mz.mzdkplayer.tool.Tools.formatFileSize
 import org.mz.mzdkplayer.tool.viewModelWithFactory
+import org.mz.mzdkplayer.ui.screen.common.CirCleIconButton
 
 import org.mz.mzdkplayer.ui.screen.common.FileEmptyScreen
+import org.mz.mzdkplayer.ui.screen.common.FileIcon
+import org.mz.mzdkplayer.ui.screen.common.FileName
+import org.mz.mzdkplayer.ui.screen.common.FileSize
 
 import org.mz.mzdkplayer.ui.screen.common.LoadingScreen
+import org.mz.mzdkplayer.ui.screen.common.MediaFocusedFileName
+import org.mz.mzdkplayer.ui.screen.common.MediaInfoLoading
+import org.mz.mzdkplayer.ui.screen.common.MediaReleaseDate
+import org.mz.mzdkplayer.ui.screen.common.MediaTitle
 import org.mz.mzdkplayer.ui.screen.common.MyFileDialog
-import org.mz.mzdkplayer.ui.screen.common.MyIconButton
 import org.mz.mzdkplayer.ui.screen.common.VAErrorScreen
 import org.mz.mzdkplayer.ui.screen.vm.SMBConViewModel
 
@@ -166,11 +166,13 @@ fun SMBFileListScreen(
                 Log.d("SMBFileListScreen", "已连接，列出文件: ${smbConfig.path}")
                 viewModel.listSMBFiles(smbConfig)
             }
+
             is FileConnectionStatus.Error -> {
                 val errorMessage = (connectionStatus as FileConnectionStatus.Error).message
                 Log.e("SMBFileListScreen", "连接错误: $errorMessage")
                 Toast.makeText(context, "SMB错误: $errorMessage", Toast.LENGTH_LONG).show()
             }
+
             else -> {}
         }
     }
@@ -223,9 +225,11 @@ fun SMBFileListScreen(
 
                 } else {
                     Row(Modifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically) {
-                        Column( modifier = Modifier
-                            .fillMaxHeight()
-                            .weight(0.7f),)
+                        Column(
+                            modifier = Modifier
+                                .fillMaxHeight()
+                                .weight(0.7f),
+                        )
                         {
 
                             LazyColumn(
@@ -242,9 +246,7 @@ fun SMBFileListScreen(
                                             NoSearchResult(text = "没有匹配 \"$seaText\" 的文件")
                                         }
                                     }
-
                                     // 目录本身为空（未搜索时）
-
                                     else -> {
                                         items(filteredFiles) { file ->
                                             val fileExtension =
@@ -438,10 +440,10 @@ fun SMBFileListScreen(
                                                                 )
                                                             focusedMediaUri =
                                                                 "smb://${file.username}:${file.password}@${file.server}/${file.share}${file.fullPath}"
-                                                            Log.d(
-                                                                "SMBFileListScreen",
-                                                                "焦点变化: ${file.name}, 是目录: $focusedMediaUri"
-                                                            )
+//                                                            Log.d(
+//                                                                "SMBFileListScreen",
+//                                                                "焦点变化: ${file.name}, 是目录: $focusedMediaUri"
+//                                                            )
                                                         }
                                                     },
                                                 scale = ListItemDefaults.scale(
@@ -449,62 +451,15 @@ fun SMBFileListScreen(
                                                     focusedScale = 1.01f
                                                 ),
                                                 leadingContent = {
-                                                    val fileExtension =
-                                                        Tools.extractFileExtension(file.name)
-                                                    Icon(
-                                                        painter = when {
-                                                            file.isDirectory -> painterResource(R.drawable.baseline_folder_24)
-                                                            Tools.containsVideoFormat(fileExtension) -> painterResource(
-                                                                R.drawable.moviefileicon
-                                                            )
-
-                                                            Tools.containsAudioFormat(fileExtension) -> painterResource(
-                                                                R.drawable.baseline_music_note_24
-                                                            )
-
-                                                            Tools.containsImageFileExtension(
-                                                                fileExtension
-                                                            ) -> painterResource(R.drawable.image24dp)
-
-                                                            else -> painterResource(R.drawable.baseline_insert_drive_file_24)
-                                                        },
-                                                        contentDescription = null,
-                                                    )
+                                                    val fileExtension = Tools.extractFileExtension(file.name)
+                                                    FileIcon(file.isDirectory, fileExtension)
                                                 },
                                                 headlineContent = {
-                                                    Text(
-                                                        file.name,
-                                                        maxLines = 1,
-                                                        overflow = TextOverflow.Ellipsis,
-                                                        fontSize = 10.sp
-                                                    )
+                                                    FileName(file.name)
                                                 },
                                                 trailingContent = {
                                                     // 只有文件才显示大小，目录可以留空或显示项数
-                                                    if (!file.isDirectory) {
-                                                        Box(
-                                                            modifier = Modifier.widthIn(min = 60.dp), // 设置最小宽度，确保单位对齐
-                                                            contentAlignment = Alignment.CenterEnd    // 文字靠右对齐
-                                                        ) {
-                                                            Text(
-                                                                text = formatFileSize(file.fileSize),
-                                                                maxLines = 1,
-                                                                style = TextStyle(
-                                                                    fontSize = 10.sp,
-                                                                    textAlign = TextAlign.End,
-                                                                    color = Color.Gray
-                                                                )
-                                                            )
-                                                        }
-                                                    } else {
-                                                         //如果是目录，可以显示一个小箭头或者保持空白
-                                                        Icon(
-                                                            painter = painterResource(R.drawable.arrowright24dp),
-                                                            contentDescription = null,
-                                                            modifier = Modifier.size(24.dp),
-                                                            tint = Color.Gray
-                                                        )
-                                                    }
+                                                    FileSize(file.isDirectory, file.fileSize)
                                                 }
                                             )
 
@@ -521,7 +476,7 @@ fun SMBFileListScreen(
                                 .fillMaxHeight()
                                 .weight(0.3f),
                             horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                            verticalArrangement = Arrangement.Top
                         )
                         {
                             // 搜索框放在最上面
@@ -536,38 +491,57 @@ fun SMBFileListScreen(
                                 textStyle = TextStyle(color = Color.White),
                             )
 
-                            // 添加弹性空间，让海报区域在垂直方向上居中
-                            Spacer(modifier = Modifier.weight(1f))
-                            // 电影海报区域 - 进一步缩小尺寸
+                            // 2. 中间的海报和文字区域（包裹在一个 Column 里）
+                            Column(
+                                modifier = Modifier.weight(1f), // 关键：让中间区域占据所有剩余空间
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.Center // 海报在剩余空间里垂直居中
+                            ) {
 
-                            when (val movieResult = focusedMovie) {
-                                is Resource.Success -> {
-                                    val movie = movieResult.data
+                                when (val movieResult = focusedMovie) {
+                                    is Resource.Success -> {
+                                        val movie = movieResult.data
 
-                                    if (movie != null && movie.posterPath != null) {
-                                        mediaId = movie.id
-                                        // 显示电影海报
-                                        Box(
-                                            Modifier
-                                                .widthIn(180.dp, 200.dp)
-                                                .border(
-                                                    width = 2.dp,
-                                                    color = Color.Gray.copy(alpha = 0.5f),
-                                                    shape = RoundedCornerShape(20.dp)
+                                        if (movie != null && movie.posterPath != null) {
+                                            mediaId = movie.id
+                                            // 显示电影海报
+                                            Box(
+                                                Modifier
+                                                    .widthIn(180.dp, 200.dp)
+                                                    .border(
+                                                        width = 2.dp,
+                                                        color = Color.Gray.copy(alpha = 0.5f),
+                                                        shape = RoundedCornerShape(20.dp)
+                                                    )
+                                            ) {
+                                                AsyncImage(
+                                                    model = "https://image.tmdb.org/t/p/w500${movie.posterPath}",
+                                                    contentDescription = movie.title,
+                                                    contentScale = ContentScale.Fit,
+                                                    modifier = Modifier
+                                                        .fillMaxWidth()
+                                                        .clip(RoundedCornerShape(20.dp)) // 增大圆角
                                                 )
-                                        ) {
-                                            AsyncImage(
-                                                model = "https://image.tmdb.org/t/p/w500${movie.posterPath}",
-                                                contentDescription = movie.title,
-                                                contentScale = ContentScale.Fit,
+                                            }
+
+                                        } else {
+                                            // 没有电影海报，显示默认视频图标
+                                            VideoBigIcon(
+                                                focusedIsDir,
+                                                focusedFileName,
                                                 modifier = Modifier
                                                     .fillMaxWidth()
-                                                    .clip(RoundedCornerShape(20.dp)) // 增大圆角
+                                                    .height(200.dp)
+
                                             )
                                         }
+                                    }
 
-                                    } else {
-                                        // 没有电影海报，显示默认视频图标
+                                    is Resource.Loading -> {
+                                        MediaInfoLoading()
+                                    }
+
+                                    is Resource.Error -> {
                                         VideoBigIcon(
                                             focusedIsDir,
                                             focusedFileName,
@@ -579,186 +553,156 @@ fun SMBFileListScreen(
                                     }
                                 }
 
-                                is Resource.Loading -> {
-                                    Box(
-                                        modifier = Modifier
-                                            .widthIn(200.dp)
-                                            .fillMaxHeight(0.6f)
-                                            .background(Color.DarkGray.copy(alpha = 0.3f))
-                                            .clip(RoundedCornerShape(20.dp)),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Text(
-                                            "正在加载...",
-                                            color = Color.White,
-                                            fontSize = 12.sp
-                                        )
-                                    }
-                                }
-
-                                is Resource.Error -> {
-                                    VideoBigIcon(
-                                        focusedIsDir,
-                                        focusedFileName,
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .height(200.dp)
-
-                                    )
-                                }
-                            }
-
-
-                            // 电影信息区域 - 居中显示
-                            when (val movieResult = focusedMovie) {
-                                is Resource.Success -> {
-                                    val movie = movieResult.data
-                                    if (movie != null) {
-                                        Column(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .padding(horizontal = 16.dp),
-                                            horizontalAlignment = Alignment.CenterHorizontally
-                                        ) {
-                                            movie.title?.let {
-                                                Text(
-                                                    it,
-                                                    color = Color.White,
-                                                    fontWeight = FontWeight.Bold,
-                                                    fontSize = 18.sp, // 稍微减小字体
-                                                    maxLines = 2,
-                                                    overflow = TextOverflow.Ellipsis,
-                                                    textAlign = TextAlign.Center
-                                                )
+                                // 电影信息区域 - 居中显示
+                                when (val movieResult = focusedMovie) {
+                                    is Resource.Success -> {
+                                        val movie = movieResult.data
+                                        if (movie != null) {
+                                            Column(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .padding(horizontal = 16.dp),
+                                                horizontalAlignment = Alignment.CenterHorizontally
+                                            ) {
+                                                MediaTitle(movie.title)
+                                                MediaReleaseDate(movie.releaseDate)
                                             }
-
-                                            Text(
-                                                text = movie.releaseDate?.substring(0, 4) ?: "N/A",
-                                                color = Color.Gray,
-                                                fontSize = 14.sp, // 稍微减小字体
-                                                textAlign = TextAlign.Center
-                                            )
-                                        }
-                                    } else {
-                                        focusedFileName?.let { fileName ->
-                                            Text(
-                                                fileName,
-                                                color = Color.White,
-                                                fontWeight = FontWeight.Bold,
-                                                fontSize = 18.sp,
-                                                maxLines = 2,
-                                                overflow = TextOverflow.Ellipsis,
-                                                textAlign = TextAlign.Center,
-                                                modifier = Modifier.padding(horizontal = 16.dp)
-                                            )
+                                        } else {
+                                            MediaFocusedFileName(focusedFileName)
                                         }
                                     }
-                                }
 
-                                else -> {
-                                    focusedFileName?.let { fileName ->
-                                        Text(
-                                            fileName,
-                                            color = Color.White,
-                                            fontWeight = FontWeight.Bold,
-                                            fontSize = 18.sp,
-                                            maxLines = 2,
-                                            overflow = TextOverflow.Ellipsis,
-                                            textAlign = TextAlign.Center,
-                                            modifier = Modifier.padding(horizontal = 16.dp)
-                                        )
+                                    else -> {
+                                        MediaFocusedFileName(focusedFileName)
                                     }
                                 }
                             }
-
-                            // 添加一个弹性空间，让内容在垂直方向上分布更均匀
-                            Spacer(modifier = Modifier.weight(1f))
-// 工具栏区
-                            Row(
+                            // 3. 底部的进度和按钮区域
+                            // 不再嵌套在上面的 Column 里，而是直接放在最外层 Column 的底部
+                            Column(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(horizontal = 16.dp, vertical = 8.dp),
-                                horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally), // 按钮间距
-                            )
-                            {
-                                // --- 视频扫描按钮 ---
-                                MyIconButton(
-                                    if (isScanning && currentScanIndex > 0) "正在获取信息 $currentScanIndex/$totalScanCount" else "批量添加到视频库",
-                                    icon = R.drawable.sync24dp,
-                                    onClick = {
-                                        // 1. 过滤出所有的视频文件 (不递归，只取当前层级)
-                                        val videoFilesToScan = files.filter { file ->
-                                            !file.isDirectory &&
-                                                    Tools.containsVideoFormat(
+                                    .padding(bottom = 16.dp), // 距离底部边缘一点间距
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                // 进度显示区：固定高度 30.dp 左右，避免布局跳动
+
+                                        // 进度显示区：固定高度 30.dp 左右，避免布局跳动
+                                        Box(
+                                            modifier = Modifier.height(30.dp),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            val progressText = when {
+                                                isScanning -> if (totalScanCount > 0) "正在获取视频信息 $currentScanIndex/$totalScanCount" else "正在准备视频扫描..."
+                                                isAudioScanning -> "正在解析音乐文件名..."
+                                                else -> null // 返回 null 不显示
+                                            }
+                                            progressText?.let {
+                                                Text(text = it, color = Color.Gray, fontSize = 12.sp)
+                                            }
+                                        }
+// 按钮行
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterHorizontally),
+                                ) {
+                                        // 按钮行
+                                        // --- 视频扫描按钮 ---
+                                        CirCleIconButton(
+                                            icon = painterResource(R.drawable.videoadd24dp),
+                                            // 动态显示 tooltip 内容
+                                            tooltip = if (isScanning && totalScanCount > 0)
+                                                "正在获取信息 $currentScanIndex/$totalScanCount"
+                                            else "批量添加到视频库",
+                                            onClick = {
+                                                // 1. 过滤出所有的视频文件 (不递归，只取当前层级)
+                                                val videoFilesToScan = files.filter { file ->
+                                                    !file.isDirectory &&
+                                                            Tools.containsVideoFormat(
+                                                                Tools.extractFileExtension(
+                                                                    file.name
+                                                                )
+                                                            )
+                                                }
+
+                                                if (videoFilesToScan.isEmpty()) {
+                                                    Toast.makeText(
+                                                        context,
+                                                        "当前目录没有视频文件",
+                                                        Toast.LENGTH_SHORT
+                                                    ).show()
+                                                    return@CirCleIconButton
+                                                }
+
+                                                // 2. 构建数据列表 Pair(fileName, fullUri)
+                                                // 注意：URI 的构建规则必须和 LazyColumn 里点击时的规则完全一致
+                                                val scanList = videoFilesToScan.map { file ->
+                                                    val uri =
+                                                        "smb://${file.username}:${file.password}@${file.server}/${file.share}${file.fullPath}"
+                                                    file.name to uri
+                                                }
+
+                                                // 3. 调用 ViewModel 开始后台任务
+                                                Toast.makeText(
+                                                    context,
+                                                    "开始后台获取信息，请稍候...",
+                                                    Toast.LENGTH_SHORT
+                                                ).show()
+                                                movieViewModel.batchScrapeVideoInfo(
+                                                    videoList = scanList,
+                                                    dataSourceType = "SMB",
+                                                    connectionName = connectionName
+                                                )
+                                            }
+                                        )
+                                        // --- 音乐扫描按钮 ---
+                                        CirCleIconButton(
+                                            icon = painterResource(R.drawable.musicnoteadd_24dp),
+                                            tooltip = if (isAudioScanning) "正在解析文件名..." else "批量添加到音乐库",
+                                            onClick = {
+                                                // 1. 过滤音频文件
+                                                val audioFiles = files.filter {
+                                                    !it.isDirectory && Tools.containsAudioFormat(
                                                         Tools.extractFileExtension(
-                                                            file.name
+                                                            it.name
                                                         )
                                                     )
-                                        }
+                                                }
 
-                                        if (videoFilesToScan.isEmpty()) {
-                                            Toast.makeText(
-                                                context,
-                                                "当前目录没有视频文件",
-                                                Toast.LENGTH_SHORT
-                                            ).show()
-                                            return@MyIconButton
-                                        }
+                                                if (audioFiles.isEmpty()) {
+                                                    Toast.makeText(
+                                                        context,
+                                                        "没有发现音频文件",
+                                                        Toast.LENGTH_SHORT
+                                                    ).show()
+                                                    return@CirCleIconButton
+                                                }
 
-                                        // 2. 构建数据列表 Pair(fileName, fullUri)
-                                        // 注意：URI 的构建规则必须和 LazyColumn 里点击时的规则完全一致
-                                        val scanList = videoFilesToScan.map { file ->
-                                            val uri =
-                                                "smb://${file.username}:${file.password}@${file.server}/${file.share}${file.fullPath}"
-                                            file.name to uri
-                                        }
+                                                // 2. 只有文件名和URI是必须的
+                                                val list = audioFiles.map {
+                                                    it.name to "smb://${it.username}:${it.password}@${it.server}/${it.share}${it.fullPath}"
+                                                }
 
-                                        // 3. 调用 ViewModel 开始后台任务
-                                        Toast.makeText(
-                                            context,
-                                            "开始后台获取信息，请稍候...",
-                                            Toast.LENGTH_SHORT
-                                        ).show()
-                                        movieViewModel.batchScrapeVideoInfo(
-                                            videoList = scanList,
-                                            dataSourceType = "SMB",
-                                            connectionName = connectionName
+                                                // 3. 直接调用，瞬间完成
+                                                audioViewModel.batchScrapeAudioInfo(
+                                                    audioList = list,
+                                                    dataSourceType = "SMB",
+                                                    connectionName = connectionName
+                                                )
+                                                Toast.makeText(
+                                                    context,
+                                                    "已在后台添加 ${list.size} 首音乐",
+                                                    Toast.LENGTH_SHORT
+                                                ).show()
+                                            }
                                         )
-                                    }, isFileBut = true)
-                                // --- 音乐扫描按钮 ---
-                                MyIconButton(
-                                    text = if (isAudioScanning) "正在解析文件名..." else "批量添加到音乐库",
-                                    icon = R.drawable.sync24dp,
-                                    onClick = {
-                                        // 1. 过滤音频文件
-                                        val audioFiles = files.filter {
-                                            !it.isDirectory && Tools.containsAudioFormat(Tools.extractFileExtension(it.name))
-                                        }
+                                    }
 
-                                        if (audioFiles.isEmpty()) {
-                                            Toast.makeText(context, "没有发现音频文件", Toast.LENGTH_SHORT).show()
-                                            return@MyIconButton
-                                        }
-
-                                        // 2. 只有文件名和URI是必须的
-                                        val list = audioFiles.map {
-                                            it.name to "smb://${it.username}:${it.password}@${it.server}/${it.share}${it.fullPath}"
-                                        }
-
-                                        // 3. 直接调用，瞬间完成
-                                        audioViewModel.batchScrapeAudioInfo(
-                                            audioList = list,
-                                            dataSourceType = "SMB",
-                                            connectionName = connectionName
-                                        )
-                                        Toast.makeText(context, "已在后台添加 ${list.size} 首音乐", Toast.LENGTH_SHORT).show()
-                                    },isFileBut = true
-                                )
-                            }
-
+                                }
+                            }}
                         }
-                    }
-                }
+
+
             }
 
             is FileConnectionStatus.Error -> {
@@ -784,7 +728,14 @@ fun SMBFileListScreen(
             fileName = focusedFileName,
             onEditClick = {
                 showEditDialog = false
-                navController.navigate("EditTMDBInfoScreen/${URLEncoder.encode(focusedMediaUri,"UTF-8")}")
+                navController.navigate(
+                    "EditTMDBInfoScreen/${
+                        URLEncoder.encode(
+                            focusedMediaUri,
+                            "UTF-8"
+                        )
+                    }"
+                )
             },
             onCloseClick = { showEditDialog = false }
         )

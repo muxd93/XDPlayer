@@ -1,5 +1,6 @@
 package org.mz.mzdkplayer.ui.screen.vm
 
+import org.mz.mzdkplayer.tool.MediaInfoExtractorFormFileName
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -21,6 +22,7 @@ import org.mz.mzdkplayer.data.model.TVEpisode
 import org.mz.mzdkplayer.data.model.TVSeriesDetails
 import org.mz.mzdkplayer.data.repository.Resource
 import org.mz.mzdkplayer.data.repository.TmdbRepository
+import org.mz.mzdkplayer.tool.MediaInfo
 
 class MovieViewModel(private val repository: TmdbRepository,private val mediaDao: MediaDao) : ViewModel() {
 
@@ -65,17 +67,15 @@ class MovieViewModel(private val repository: TmdbRepository,private val mediaDao
     private var currentSearchJob: Job? = null
 
     /**
-     * [修改] 搜索焦点电影/剧集 (带缓存)
-     * 增加了 dataSourceType, connectionName 参数以便存入数据库
+     * [修改] 搜索焦点电影/剧集 (一步到位获取详情)
      */
     fun searchFocusedMovie(
         movieName: String?,
         isDirectory: Boolean,
         videoUri: String,
-        dataSourceType: String, // 新增
-        connectionName: String  // 新增
-    )
-    {
+        dataSourceType: String,
+        connectionName: String
+    ) {
         if (isDirectory) {
             _focusedMovie.value = Resource.Success(null)
             return
@@ -89,94 +89,41 @@ class MovieViewModel(private val repository: TmdbRepository,private val mediaDao
             if (cachedMedia != null) {
                 Log.d("MovieViewModel", "Hit Cache for: $movieName")
                 _focusedMovie.value = Resource.Success(cachedMedia.toMediaItem())
+
+                // [优化] 如果缓存里只是基础信息(isDetailsLoaded=false)，这里可以静默去更新一下详情
+                // 如果不需要自动补全详情，可以把下面这段 if 去掉
+                if (!cachedMedia.isDetailsLoaded) {
+                    val mediaInfo = MediaInfoExtractorFormFileName.extract(movieName ?: "")
+                    searchAndFetchFullDetails(mediaInfo, videoUri, dataSourceType, fileName = movieName ?: "", connectionName)
+                    // 更新完后重新发个通知给 UI
+                    val updated = mediaDao.getMediaByUri(videoUri)
+                    if (updated != null) _focusedMovie.value = Resource.Success(updated.toMediaItem())
+                }
                 return@launch
             }
 
             _focusedMovie.value = Resource.Loading
-            delay(800)
-            if (movieName==null) {
+            delay(500) // 稍微防抖一下
+
+            if (movieName == null) {
                 _focusedMovie.value = Resource.Success(null)
                 return@launch
             }
+
             val mediaInfo = MediaInfoExtractorFormFileName.extract(movieName)
             if (mediaInfo.title.isBlank()) {
                 _focusedMovie.value = Resource.Success(null)
                 return@launch
             }
 
-            try {
-                if (mediaInfo.mediaType == "movie") {
-                    val result = repository.searchMovies(mediaInfo.title, year = mediaInfo.year)
-                    if (result is Resource.Success) {
-                        val movie = result.data.results.firstOrNull()
-                        if (movie != null) {
-//                            val groupKey = if (media.mediaType == "tv") {
-//                                // TV 使用 tmdbId 作为分组键
-//                                "tv_${media.tmdbId}"
-//                            } else {
-//                                // 电影使用 videoUri (主键) 作为分组键
-//                                "movie_${media.videoUri}"
-//                            }
-                            // [修改] 保存到数据库时填入新字段
-                            val entity = MediaCacheEntity(
-                                videoUri = videoUri,
-                                dataSourceType = dataSourceType, // 保存
-                                fileName = movieName,            // 保存原始文件名
-                                connectionName = connectionName, // 保存
-                                tmdbId = movie.id,
-                                mediaType = "movie",
-                                title = movie.title ?: "",
-                                overview = movie.overview,
-                                posterPath = movie.posterPath,
-                                backdropPath = movie.backdropPath,
-                                releaseDate = movie.releaseDate,
-                                voteAverage = movie.voteAverage,
-                                isDetailsLoaded = false,
-                                groupKey = "movie_${videoUri}"
-                            )
-                            mediaDao.insertMedia(entity)
-                            _focusedMovie.value = Resource.Success(entity.toMediaItem())
-                        } else {
-                            _focusedMovie.value = Resource.Success(null)
-                        }
-                    } else if (result is Resource.Error) {
-                        _focusedMovie.value = Resource.Error(result.message, result.exception)
-                    }
-                } else {
-                    val result = repository.searchTV(mediaInfo.title, year = mediaInfo.year)
-                    if (result is Resource.Success) {
-                        val tv = result.data.results.firstOrNull()
-                        if (tv != null) {
-                            // [修改] 保存到数据库时填入新字段
-                            val entity = MediaCacheEntity(
-                                videoUri = videoUri,
-                                dataSourceType = dataSourceType, // 保存
-                                fileName = movieName,            // 保存
-                                connectionName = connectionName, // 保存
-                                tmdbId = tv.id,
-                                mediaType = "tv",
-                                title = tv.name ?: "",
-                                overview = tv.overview,
-                                posterPath = tv.posterPath,
-                                backdropPath = tv.backdropPath,
-                                releaseDate = tv.firstAirDate,
-                                voteAverage = tv.voteAverage,
-                                seasonNumber = mediaInfo.season.toIntOrNull() ?: 1,
-                                episodeNumber = mediaInfo.episode.toIntOrNull() ?: 1,
-                                isDetailsLoaded = false,
-                                groupKey = "tv_${tv.id}"
-                            )
-                            mediaDao.insertMedia(entity)
-                            _focusedMovie.value = Resource.Success(entity.toMediaItem())
-                        } else {
-                            _focusedMovie.value = Resource.Success(null)
-                        }
-                    } else if (result is Resource.Error) {
-                        _focusedMovie.value = Resource.Error(result.message, result.exception)
-                    }
-                }
-            } catch (e: Exception) {
-                _focusedMovie.value = Resource.Error("Search failed", e)
+            // [核心修改] 调用新方法：搜索 + 获取详情 + 入库
+            val savedEntity = searchAndFetchFullDetails(mediaInfo, videoUri, dataSourceType, movieName, connectionName)
+
+            if (savedEntity != null) {
+                _focusedMovie.value = Resource.Success(savedEntity.toMediaItem())
+            } else {
+                // 如果搜不到，或者网络错误，返回 Null 或者错误
+                _focusedMovie.value = Resource.Success(null)
             }
         }
     }
@@ -409,101 +356,46 @@ class MovieViewModel(private val repository: TmdbRepository,private val mediaDao
         }
     }
     /**
-     * 批量扫描当前目录下的视频文件
-     * @param videoList 包含 (文件名, 完整URI) 的列表
+     * 批量扫描当前目录下的视频文件 (同时获取完整详情)
      */
     fun batchScrapeVideoInfo(
         videoList: List<Pair<String, String>>, // Pair(fileName, videoUri)
         dataSourceType: String,
         connectionName: String
     ) {
-        if (_isScanning.value) return // 防止重复点击
+        if (_isScanning.value) return
 
         viewModelScope.launch(Dispatchers.IO) {
             _isScanning.value = true
-            _totalScanCount.value = videoList.size // 设置总数
-            _currentScanIndex.value = 0 // 重置进度
-            Log.d("MovieViewModel", "开始批量扫描，待处理数量: ${videoList.size}")
+            _totalScanCount.value = videoList.size
+            _currentScanIndex.value = 0
+            Log.d("MovieViewModel", "开始批量扫描(含详情)，待处理: ${videoList.size}")
 
             try {
                 videoList.forEachIndexed { index, (fileName, videoUri) ->
+                    _currentScanIndex.value = index + 1
 
-                    _currentScanIndex.value = index + 1 // 进度从 1 开始
-                    // 1. 检查数据库是否已存在 (避免重复请求)
+                    // 1. 检查数据库
                     val cachedMedia = mediaDao.getMediaByUri(videoUri)
                     if (cachedMedia != null) {
-                        if (index > 0) delay(100)
-                        Log.d("MovieViewModel", "跳过已存在: $fileName")
-                        return@forEachIndexed // continue
+                        // 如果已存在且详情已加载，直接跳过
+                        if (cachedMedia.isDetailsLoaded) {
+                            Log.d("MovieViewModel", "跳过已存在完整数据: $fileName")
+                            return@forEachIndexed
+                        }
+                        // 如果只是基础数据，可以选择继续往下走去更新详情
                     }
 
-                    // 2. 提取文件名信息
                     val mediaInfo = MediaInfoExtractorFormFileName.extract(fileName)
                     if (mediaInfo.title.isBlank()) return@forEachIndexed
 
-                    // 3. 延时，防止速度太快 (2秒一次)
-                    if (index > 0) delay(2000)
+                    // 2. 延时防封 (因为现在请求多了，稍微保持一点间隔)
+                    if (index > 0) delay(1500)
 
-                    Log.d("MovieViewModel", "正在获取信息 ($index/${videoList.size}): ${mediaInfo.title}")
+                    Log.d("MovieViewModel", "正在获取完整信息 ($index/${videoList.size}): ${mediaInfo.title}")
 
-                    try {
-                        // 4. 执行搜索并入库 (逻辑复用 searchFocusedMovie 的核心部分，但不更新 _focusedMovie)
-                        if (mediaInfo.mediaType == "movie") {
-                            val result = repository.searchMovies(mediaInfo.title, year = mediaInfo.year)
-                            if (result is Resource.Success) {
-                                val movie = result.data.results.firstOrNull()
-                                if (movie != null) {
-                                    val entity = MediaCacheEntity(
-                                        videoUri = videoUri,
-                                        dataSourceType = dataSourceType,
-                                        fileName = fileName,
-                                        connectionName = connectionName,
-                                        tmdbId = movie.id,
-                                        mediaType = "movie",
-                                        title = movie.title ?: "",
-                                        overview = movie.overview,
-                                        posterPath = movie.posterPath,
-                                        backdropPath = movie.backdropPath,
-                                        releaseDate = movie.releaseDate,
-                                        voteAverage = movie.voteAverage,
-                                        isDetailsLoaded = false,
-                                        groupKey = "movie_${videoUri}"
-                                    )
-                                    mediaDao.insertMedia(entity)
-                                    Log.d("MovieViewModel", "入库成功: ${movie.title}")
-                                }
-                            }
-                        } else {
-                            val result = repository.searchTV(mediaInfo.title, year = mediaInfo.year)
-                            if (result is Resource.Success) {
-                                val tv = result.data.results.firstOrNull()
-                                if (tv != null) {
-                                    val entity = MediaCacheEntity(
-                                        videoUri = videoUri,
-                                        dataSourceType = dataSourceType,
-                                        fileName = fileName,
-                                        connectionName = connectionName,
-                                        tmdbId = tv.id,
-                                        mediaType = "tv",
-                                        title = tv.name ?: "",
-                                        overview = tv.overview,
-                                        posterPath = tv.posterPath,
-                                        backdropPath = tv.backdropPath,
-                                        releaseDate = tv.firstAirDate,
-                                        voteAverage = tv.voteAverage,
-                                        seasonNumber = mediaInfo.season.toIntOrNull() ?: 1,
-                                        episodeNumber = mediaInfo.episode.toIntOrNull() ?: 1,
-                                        isDetailsLoaded = false,
-                                        groupKey = "tv_${tv.id}"
-                                    )
-                                    mediaDao.insertMedia(entity)
-                                    Log.d("MovieViewModel", "入库成功: ${tv.name}")
-                                }
-                            }
-                        }
-                    } catch (e: Exception) {
-                        Log.e("MovieViewModel", "获取单个信息失败: $fileName", e)
-                    }
+                    // [核心修改] 调用通用方法获取完整详情
+                    searchAndFetchFullDetails(mediaInfo, videoUri, dataSourceType, fileName, connectionName)
                 }
             } finally {
                 _isScanning.value = false
@@ -564,52 +456,228 @@ class MovieViewModel(private val repository: TmdbRepository,private val mediaDao
         }
     }
     /**
-     * [新增] 手动保存/修正文件映射
-     * 这一步会直接覆写 media_cache 中该 videoUri 对应的记录
+     * [修改] 手动保存/修正文件映射 (修正后立即获取完整详情)
      */
     fun updateMediaMapping(
         videoUri: String,
-        selectedMedia: MediaItem, // 用户选中的 TMDB 条目
+        selectedMedia: MediaItem, // 用户选中的 TMDB 条目 (只包含基础信息)
         seasonNumber: Int,        // 用户输入的季 (仅TV有效)
         episodeNumber: Int,       // 用户输入的集 (仅TV有效)
         originalFileName: String,
-        dataSourceType: String = "SMB", // 默认，可视情况传参
-        connectionName: String = "电影"     // 默认，可视情况传参
+        dataSourceType: String = "SMB",
+        connectionName: String = "电影"
     ) {
         viewModelScope.launch(Dispatchers.IO) {
-            // 先尝试获取旧记录以保留一些元数据（如 connectionName）
+            // 1. 获取旧记录以保留连接信息
             val oldRecord = mediaDao.getMediaByUri(videoUri)
+            val finalDataSource = oldRecord?.dataSourceType ?: dataSourceType
+            val finalConnection = oldRecord?.connectionName ?: connectionName
 
-            val newEntity = MediaCacheEntity(
-                videoUri = videoUri,
-                dataSourceType = oldRecord?.dataSourceType ?: dataSourceType,
-                fileName = originalFileName, // 保持原始文件名
-                connectionName = oldRecord?.connectionName ?: connectionName,
+            try {
+                if (selectedMedia.isMovie) {
+                    // === 电影逻辑：立即获取详情 ===
+                    val detailResult = repository.getMovieDetails(selectedMedia.id)
+                    // 如果获取成功用详情，失败用基础信息
+                    val finalDetails = if (detailResult is Resource.Success) detailResult.data else null
 
-                tmdbId = selectedMedia.id,
-                mediaType = if (selectedMedia.isMovie) "movie" else "tv",
-                title = selectedMedia.title?:"未知标题",
-                overview = selectedMedia.overview,
-                posterPath = selectedMedia.posterPath,
-                backdropPath = selectedMedia.backdropPath,
-                releaseDate = selectedMedia.releaseDate,
-                voteAverage = 0.0, // 简略信息暂无评分，详情页会自动更新
+                    val newEntity = MediaCacheEntity(
+                        videoUri = videoUri,
+                        dataSourceType = finalDataSource,
+                        fileName = originalFileName,
+                        connectionName = finalConnection,
+                        tmdbId = selectedMedia.id,
+                        mediaType = "movie",
+                        // 优先用详情数据
+                        title = finalDetails?.title ?: selectedMedia.title ?: "",
+                        overview = finalDetails?.overview ?: selectedMedia.overview,
+                        posterPath = finalDetails?.posterPath ?: selectedMedia.posterPath,
+                        backdropPath = finalDetails?.backdropPath ?: selectedMedia.backdropPath,
+                        releaseDate = finalDetails?.releaseDate ?: selectedMedia.releaseDate,
+                        voteAverage = finalDetails?.voteAverage ?: 0.0,
+                        // 详情字段
+                        status = finalDetails?.status?:"未知状态",
+                        genres = finalDetails?.genreList ?: emptyList(),
+                        originCountry = finalDetails?.originCountry ?: emptyList(),
+                        isDetailsLoaded = finalDetails != null, // 标记是否加载完成
+                        groupKey = "movie_${videoUri}"
+                    )
+                    mediaDao.insertMedia(newEntity)
 
-                // TV 修正的关键字段
-                seasonNumber = if (selectedMedia.isMovie) 0 else seasonNumber,
-                episodeNumber = if (selectedMedia.isMovie) 0 else episodeNumber,
+                } else {
+                    // === TV 逻辑：立即获取系列详情 + 分集详情 ===
+                    // 使用 async 并行请求
+                    val seriesDeferred = async { repository.getTVSeriesDetails(selectedMedia.id) }
+                    val episodeDeferred = async { repository.getTVEpisodeDetails(selectedMedia.id, seasonNumber, episodeNumber) }
 
-                // 重置详情状态，以便下次进入详情页时重新拉取正确的详细元数据
-                isDetailsLoaded = false,
-                groupKey = if(selectedMedia.isMovie) "movie_${videoUri}" else "tv_${selectedMedia.id}"
-            )
+                    val seriesResult = seriesDeferred.await()
+                    val episodeResult = episodeDeferred.await()
 
-            mediaDao.insertMedia(newEntity)
-            Log.d("MovieViewModel", "手动修正映射成功: ${selectedMedia.title}")
+                    val sData = if (seriesResult is Resource.Success) seriesResult.data else null
+                    val eData = if (episodeResult is Resource.Success) episodeResult.data else null
 
-            // 可选：更新 focusedMovie 以便返回界面时立即刷新
-            _focusedMovie.value = Resource.Success(newEntity.toMediaItem())
+                    val newEntity = MediaCacheEntity(
+                        videoUri = videoUri,
+                        dataSourceType = finalDataSource,
+                        fileName = originalFileName,
+                        connectionName = finalConnection,
+                        tmdbId = selectedMedia.id,
+                        mediaType = "tv",
+                        // 基础/系列信息
+                        title = sData?.name ?: selectedMedia.title ?: "",
+                        overview = sData?.overview ?: selectedMedia.overview,
+                        posterPath = sData?.posterPath ?: selectedMedia.posterPath,
+                        backdropPath = sData?.backdropPath ?: selectedMedia.backdropPath,
+                        releaseDate = sData?.firstAirDate ?: selectedMedia.releaseDate,
+                        voteAverage = sData?.voteAverage ?: 0.0,
+                        status = sData?.status?:"未知状态",
+                        genres = sData?.genreList ?: emptyList(),
+                        originCountry = sData?.originCountry ?: emptyList(),
+                        numberOfSeasons = sData?.numberOfSeasons,
+                        numberOfEpisodes = sData?.numberOfEpisodes,
+                        // 修正后的季/集信息
+                        seasonNumber = seasonNumber,
+                        episodeNumber = episodeNumber,
+                        // 分集详情
+                        episodeName = eData?.name,
+                        episodeOverview = eData?.overview,
+                        episodeStillPath = eData?.stillPath,
+                        episodeAirDate = eData?.airDate,
+                        episodeRuntime = eData?.runtime,
+
+                        isDetailsLoaded = sData != null,
+                        groupKey = "tv_${selectedMedia.id}"
+                    )
+                    mediaDao.insertMedia(newEntity)
+                }
+
+                Log.d("MovieViewModel", "手动修正并获取详情成功: ${selectedMedia.title}")
+
+                // 立即更新当前焦点的 StateFlow，这样 UI 会马上刷新背景和文字
+                val updatedEntity = mediaDao.getMediaByUri(videoUri)
+                if (updatedEntity != null) {
+                    _focusedMovie.value = Resource.Success(updatedEntity.toMediaItem())
+                }
+
+            } catch (e: Exception) {
+                Log.e("MovieViewModel", "手动修正获取详情失败", e)
+                // 发生异常时，至少保存一个基础版本，防止白屏
+                // 这里可以写一个降级逻辑，或者直接提示失败
+            }
         }
+    }
+
+    // [新增] 核心通用方法：搜索并获取完整详情，然后入库
+// 返回插入的 Entity，如果失败返回 null
+    private suspend fun searchAndFetchFullDetails(
+        mediaInfo: MediaInfo,
+        videoUri: String,
+        dataSourceType: String,
+        fileName: String,
+        connectionName: String
+    ): MediaCacheEntity? {
+        try {
+            if (mediaInfo.mediaType == "movie") {
+                // 1. 搜索电影
+                val searchResult = repository.searchMovies(mediaInfo.title, year = mediaInfo.year)
+                if (searchResult is Resource.Success) {
+                    val basicMovie = searchResult.data.results.firstOrNull() ?: return null
+
+                    // 2. 立即获取详细信息
+                    val detailResult = repository.getMovieDetails(basicMovie.id)
+                    val finalDetails = if (detailResult is Resource.Success) detailResult.data else null
+
+                    // 3. 构建包含详情的实体
+                    val entity = MediaCacheEntity(
+                        videoUri = videoUri,
+                        dataSourceType = dataSourceType,
+                        fileName = fileName,
+                        connectionName = connectionName,
+                        tmdbId = basicMovie.id,
+                        mediaType = "movie",
+                        // 优先使用详情里的数据
+                        title = finalDetails?.title ?: basicMovie.title ?: "",
+                        overview = finalDetails?.overview ?: basicMovie.overview,
+                        posterPath = finalDetails?.posterPath ?: basicMovie.posterPath,
+                        backdropPath = finalDetails?.backdropPath ?: basicMovie.backdropPath,
+                        releaseDate = finalDetails?.releaseDate ?: basicMovie.releaseDate,
+                        voteAverage = finalDetails?.voteAverage ?: basicMovie.voteAverage,
+                        // 详情特有字段
+                        status = finalDetails?.status ?: "未知状态",
+                        genres = finalDetails?.genreList ?: emptyList(),
+                        originCountry = finalDetails?.originCountry ?: emptyList(),
+                        // 标记为详情已加载
+                        isDetailsLoaded = finalDetails != null,
+                        groupKey = "movie_${videoUri}"
+                    )
+                    mediaDao.insertMedia(entity)
+                    return entity
+                }
+            } else {
+                // 1. 搜索 TV
+                val searchResult = repository.searchTV(mediaInfo.title, year = mediaInfo.year)
+                if (searchResult is Resource.Success) {
+                    val basicTV = searchResult.data.results.firstOrNull() ?: return null
+
+                    // 2. 并行获取 Series详情 和 Episode详情
+                    val seriesDeferred = viewModelScope.async(Dispatchers.IO) {
+                        repository.getTVSeriesDetails(basicTV.id)
+                    }
+
+                    // 如果文件名里解析出了季和集，就去查分集详情，否则只查剧集详情
+                    val seasonNum = mediaInfo.season.toIntOrNull() ?: 1
+                    val episodeNum = mediaInfo.episode.toIntOrNull() ?: 1
+
+                    val episodeDeferred = viewModelScope.async(Dispatchers.IO) {
+                        repository.getTVEpisodeDetails(basicTV.id, seasonNum, episodeNum)
+                    }
+
+                    val seriesResult = seriesDeferred.await()
+                    val episodeResult = episodeDeferred.await()
+
+                    val sData = if (seriesResult is Resource.Success) seriesResult.data else null
+                    val eData = if (episodeResult is Resource.Success) episodeResult.data else null
+
+                    // 3. 构建包含详情的实体
+                    val entity = MediaCacheEntity(
+                        videoUri = videoUri,
+                        dataSourceType = dataSourceType,
+                        fileName = fileName,
+                        connectionName = connectionName,
+                        tmdbId = basicTV.id,
+                        mediaType = "tv",
+                        title = sData?.name ?: basicTV.name ?: "",
+                        overview = sData?.overview ?: basicTV.overview, // 系列简介
+                        posterPath = sData?.posterPath ?: basicTV.posterPath,
+                        backdropPath = sData?.backdropPath ?: basicTV.backdropPath,
+                        releaseDate = sData?.firstAirDate ?: basicTV.firstAirDate,
+                        voteAverage = sData?.voteAverage ?: basicTV.voteAverage,
+                        seasonNumber = seasonNum,
+                        episodeNumber = episodeNum,
+                        // 详情特有字段
+                        status = sData?.status ?:"未知状态",
+                        genres = sData?.genreList ?: emptyList(),
+                        originCountry = sData?.originCountry ?: emptyList(),
+                        numberOfSeasons = sData?.numberOfSeasons,
+                        numberOfEpisodes = sData?.numberOfEpisodes,
+                        // 分集特有字段
+                        episodeName = eData?.name,
+                        episodeOverview = eData?.overview, // 分集简介
+                        episodeStillPath = eData?.stillPath,
+                        episodeAirDate = eData?.airDate,
+                        episodeRuntime = eData?.runtime,
+
+                        // 只要获取到了 Series 详情就算详情已加载
+                        isDetailsLoaded = sData != null,
+                        groupKey = "tv_${basicTV.id}"
+                    )
+                    mediaDao.insertMedia(entity)
+                    return entity
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("MovieViewModel", "Fetch full details failed: $fileName", e)
+        }
+        return null
     }
     // 扩展函数：把 Movie/TvData 转成通用的 MediaItem
 //    private fun Movie.toMediaItem() = MediaItem(

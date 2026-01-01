@@ -6,7 +6,6 @@ import NoSearchResult
 import android.util.Log
 import android.widget.Toast
 import androidx.annotation.OptIn
-import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -21,21 +20,13 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
-import androidx.tv.material3.Icon
 import androidx.tv.material3.ListItem
 import androidx.tv.material3.ListItemDefaults
-import androidx.tv.material3.Text
 import kotlinx.coroutines.launch
-import org.mz.mzdkplayer.R
 import org.mz.mzdkplayer.data.model.WebDavConnection
 import org.mz.mzdkplayer.tool.Tools
 import org.mz.mzdkplayer.ui.screen.vm.WebDavConViewModel
@@ -48,11 +39,19 @@ import org.mz.mzdkplayer.data.model.AudioItem
 import org.mz.mzdkplayer.data.model.FileConnectionStatus
 import org.mz.mzdkplayer.data.repository.Resource
 import org.mz.mzdkplayer.di.RepositoryProvider
+import org.mz.mzdkplayer.tool.MediaInfoExtractorFormFileName
 import org.mz.mzdkplayer.tool.Tools.VideoBigIcon
 import org.mz.mzdkplayer.tool.viewModelWithFactory
 import org.mz.mzdkplayer.ui.screen.common.FileEmptyScreen
+import org.mz.mzdkplayer.ui.screen.common.FileIcon
+import org.mz.mzdkplayer.ui.screen.common.FileName
+import org.mz.mzdkplayer.ui.screen.common.FileSize
 
 import org.mz.mzdkplayer.ui.screen.common.LoadingScreen
+import org.mz.mzdkplayer.ui.screen.common.MediaFocusedFileName
+import org.mz.mzdkplayer.ui.screen.common.MediaInfoLoading
+import org.mz.mzdkplayer.ui.screen.common.MediaReleaseDate
+import org.mz.mzdkplayer.ui.screen.common.MediaTitle
 import org.mz.mzdkplayer.ui.screen.common.VAErrorScreen
 import org.mz.mzdkplayer.ui.theme.myTTFColor
 import org.mz.mzdkplayer.ui.theme.MyFileListItemColor
@@ -354,24 +353,14 @@ fun WebDavFileListScreen(
                                             ),
                                             leadingContent = {
                                                 val fileExtension = Tools.extractFileExtension(file.name)
-                                                Icon(
-                                                    painter = when {
-                                                        file.isDirectory -> painterResource(R.drawable.baseline_folder_24)
-                                                        Tools.containsVideoFormat(fileExtension) -> painterResource(R.drawable.moviefileicon)
-                                                        Tools.containsAudioFormat(fileExtension) -> painterResource(R.drawable.baseline_music_note_24)
-                                                        Tools.containsImageFileExtension(fileExtension) -> painterResource(R.drawable.image24dp)
-                                                        else -> painterResource(R.drawable.baseline_insert_drive_file_24)
-                                                    },
-                                                    contentDescription = null,
-                                                )
+                                                FileIcon(isDirectory,fileExtension)
                                             },
                                             headlineContent = {
-                                                Text(
-                                                    file.name,
-                                                    maxLines = 1,
-                                                    overflow = TextOverflow.Ellipsis,
-                                                    fontSize = 10.sp
-                                                )
+                                                FileName(fileName)
+                                            },
+                                            trailingContent = {
+                                                // 只有文件才显示大小，目录可以留空或显示项数
+                                                FileSize(file.isDirectory,file.size)
                                             }
                                         )
                                     }
@@ -435,20 +424,7 @@ fun WebDavFileListScreen(
                                 }
 
                                 is Resource.Loading -> {
-                                    Box(
-                                        modifier = Modifier
-                                            .widthIn(200.dp)
-                                            .fillMaxHeight(0.6f)
-                                            .background(Color.DarkGray.copy(alpha = 0.3f))
-                                            .clip(RoundedCornerShape(20.dp)),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Text(
-                                            "正在加载...",
-                                            color = Color.White,
-                                            fontSize = 12.sp
-                                        )
-                                    }
+                                    MediaInfoLoading()
                                 }
 
                                 is Resource.Error -> {
@@ -472,54 +448,16 @@ fun WebDavFileListScreen(
                                                 .padding(horizontal = 16.dp),
                                             horizontalAlignment = Alignment.CenterHorizontally
                                         ) {
-                                            movie.title?.let {
-                                                Text(
-                                                    it,
-                                                    color = Color.White,
-                                                    fontWeight = FontWeight.Bold,
-                                                    fontSize = 18.sp, // 稍微减小字体
-                                                    maxLines = 2,
-                                                    overflow = TextOverflow.Ellipsis,
-                                                    textAlign = TextAlign.Center
-                                                )
-                                            }
-
-                                            Text(
-                                                text = movie.releaseDate?.substring(0, 4) ?: "N/A",
-                                                color = Color.Gray,
-                                                fontSize = 14.sp, // 稍微减小字体
-                                                textAlign = TextAlign.Center
-                                            )
+                                            MediaTitle(movie.title)
+                                            MediaReleaseDate(movie.releaseDate)
                                         }
                                     } else {
-                                        focusedFileName?.let { fileName ->
-                                            Text(
-                                                fileName,
-                                                color = Color.White,
-                                                fontWeight = FontWeight.Bold,
-                                                fontSize = 18.sp,
-                                                maxLines = 2,
-                                                overflow = TextOverflow.Ellipsis,
-                                                textAlign = TextAlign.Center,
-                                                modifier = Modifier.padding(horizontal = 16.dp)
-                                            )
-                                        }
+                                        MediaFocusedFileName(focusedFileName)
                                     }
                                 }
 
                                 else -> {
-                                    focusedFileName?.let { fileName ->
-                                        Text(
-                                            fileName,
-                                            color = Color.White,
-                                            fontWeight = FontWeight.Bold,
-                                            fontSize = 18.sp,
-                                            maxLines = 2,
-                                            overflow = TextOverflow.Ellipsis,
-                                            textAlign = TextAlign.Center,
-                                            modifier = Modifier.padding(horizontal = 16.dp)
-                                        )
-                                    }
+                                    MediaFocusedFileName(focusedFileName)
                                 }
                             }
 

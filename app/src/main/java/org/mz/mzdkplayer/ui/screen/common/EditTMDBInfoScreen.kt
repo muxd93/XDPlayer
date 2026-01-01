@@ -1,6 +1,5 @@
 package org.mz.mzdkplayer.ui.screen.common
 
-import android.net.Uri
 import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -28,12 +27,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import androidx.tv.material3.ExperimentalTvMaterial3Api
 import androidx.tv.material3.FilterChip
@@ -49,12 +46,11 @@ import org.mz.mzdkplayer.ui.theme.myTTFColor
 import java.net.URLDecoder
 
 // 假设 MediaInfoExtractorFormFileName 已经在同一个包或正确导入
-import MediaInfoExtractorFormFileName
+import org.mz.mzdkplayer.tool.MediaInfoExtractorFormFileName
 import androidx.compose.ui.res.painterResource
 import androidx.tv.material3.Icon
 import org.mz.mzdkplayer.di.RepositoryProvider
 import org.mz.mzdkplayer.tool.viewModelWithFactory
-import org.mz.mzdkplayer.ui.theme.myFileTypeCardScaleStyle
 import org.mz.mzdkplayer.ui.theme.myListItemCoverColor
 import org.mz.mzdkplayer.ui.theme.mySideFilterChipColor
 

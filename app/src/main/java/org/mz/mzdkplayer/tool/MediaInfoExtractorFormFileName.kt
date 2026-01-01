@@ -1,3 +1,5 @@
+package org.mz.mzdkplayer.tool
+
 data class MediaInfo(
     val title: String,
     val year: String,
