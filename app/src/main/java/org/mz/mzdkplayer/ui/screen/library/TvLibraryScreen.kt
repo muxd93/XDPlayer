@@ -38,6 +38,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.max
 import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
@@ -61,6 +62,7 @@ import org.mz.mzdkplayer.ui.screen.vm.MediaLibraryViewModel
 import org.mz.mzdkplayer.ui.screen.vm.SettingsViewModel
 import org.mz.mzdkplayer.ui.theme.myListItemCoverColor
 import java.net.URLEncoder
+import java.util.Locale
 
 // === 电视剧屏幕 (原生 Box 实现沉浸式列表) ===
 @OptIn(ExperimentalTvMaterial3Api::class)
@@ -205,7 +207,7 @@ fun TvLibraryScreen(
                                     viewModel.loadEpisodes(tvShow.tmdbId)
                                     showEpisodeDialog = true
                                 },
-                                onLongClick = {showEditDialog = true}
+                                onLongClick = {}
                             )
                         }
                     }
@@ -250,7 +252,7 @@ fun TvLibraryScreen(
 
                         // 元数据行：年份 | 评分
                         val year = tvShow.releaseDate?.take(4) ?: ""
-                        val rating = String.format("%.1f", tvShow.voteAverage)
+                        val rating = String.format(Locale.getDefault(),"%.1f", tvShow.voteAverage)
                         Text(
                             text = "$year  •  TMDB $rating",
                             style = MaterialTheme.typography.titleMedium,
@@ -291,7 +293,7 @@ fun TvLibraryScreen(
                     .padding(bottom = 3.dp)
             ) {
                 Text(
-                    text = "长按遥控器OK键可以调出更多操作 向右滚动以查看更多内容 →",
+                    text = "向右滚动以查看更多内容 →",
                     style = MaterialTheme.typography.bodyMedium,
                     color = Color.White.copy(alpha = 0.5f), // 半透明
                     modifier = Modifier.align(Alignment.Center)
@@ -358,9 +360,9 @@ fun EpisodeSelectionDialog(
     Dialog(onDismissRequest = onDismiss) {
         Surface(
             modifier = Modifier
-                .widthIn(max = 600.dp)
+                .widthIn(min = 400.dp, max=800.dp)
                 .height(500.dp),
-            shape = MaterialTheme.shapes.large,
+            shape = MaterialTheme.shapes.medium,
             colors = SurfaceDefaults.colors(
                 containerColor = Color(0xFF1E1E1E)
             )
@@ -372,12 +374,20 @@ fun EpisodeSelectionDialog(
                     color = Color.White,
                     fontWeight = FontWeight.Bold
                 )
-                Spacer(modifier = Modifier.height(16.dp))
+                // --- 新增提示文字 ---
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    text = "提示：长按下方剧集条目可修改该文件的 TMDB 信息",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = Color.LightGray // 使用主题色或淡蓝色强调
+                )
+                Spacer(modifier = Modifier.height(6.dp))
 
                 if (episodes.isEmpty()) {
                     Text("加载中...", color = Color.Gray)
                 } else {
                     LazyColumn(
+                        Modifier.weight(1f),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         items(episodes) { episode ->
@@ -391,20 +401,21 @@ fun EpisodeSelectionDialog(
                                 // headlineContent: 显示季集序号
                                 headlineContent = {
                                     Text(
-                                        text = "第 ${episode.seasonNumber} 季 第 ${episode.episodeNumber} 集",
+                                        text = "第 ${episode.seasonNumber} 季 第 ${episode.episodeNumber} 集 · ${
+                                            if (!episode.episodeName.isNullOrEmpty()) {
+                                                episode.episodeName
+                                            } else ""
+                                        }",
                                         fontWeight = FontWeight.Bold
                                     )
                                 },
                                 // supportingContent: 显示集名称（如果存在）
-                                supportingContent = if (!episode.episodeName.isNullOrEmpty()) {
-                                    {
-                                        Text(text = episode.episodeName)
-                                    }
-                                } else null,
+//                                supportingContent = if (!episode.episodeName.isNullOrEmpty()) {
+//                                    {
+//                                        Text(text = episode.episodeName)
+//                                    }
+//                                } else null,
                                 // trailingContent: 可以在右侧放置一个指示图标或文本
-//                                trailingContent = {
-//                                    Text(episode.dataSourceType,)
-//                                },
                                 overlineContent = {
                                     Text(
                                         "${episode.dataSourceType} · ${episode.fileName}",

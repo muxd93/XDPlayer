@@ -269,7 +269,7 @@ fun NFSFileListScreen(
                                                         )
                                                     )
                                                 ) {
-                                                    // ✅ 构建音频文件列表
+                                                    //  构建音频文件列表
                                                     val audioFiles = fileList.filter { nfsFile ->
                                                         Tools.containsAudioFormat(
                                                             Tools.extractFileExtension(
@@ -278,13 +278,13 @@ fun NFSFileListScreen(
                                                         )
                                                     }
 
-                                                    // ✅ 构建文件名到索引的映射（O(N) 一次构建）
+                                                    //  构建文件名到索引的映射（O(N) 一次构建）
                                                     val nameToIndexMap = audioFiles.withIndex()
                                                         .associateBy(
                                                             { it.value.name },
                                                             { it.index })
 
-                                                    // ✅ 快速查找索引（O(1)）
+                                                    //  快速查找索引（O(1)）
                                                     val currentAudioIndex =
                                                         nameToIndexMap[file.name] ?: -1
                                                     if (currentAudioIndex == -1) {
@@ -296,7 +296,7 @@ fun NFSFileListScreen(
 
                                                     }
 
-                                                    // ✅ 构建播放列表
+
                                                     val audioItems = audioFiles.map { nfsFile ->
                                                         AudioItem(
                                                             uri = "nfs://${nfsConnection.serverAddress}:${nfsConnection.shareName}:${nfsFile.path}",

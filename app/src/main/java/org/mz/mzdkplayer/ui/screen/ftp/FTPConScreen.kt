@@ -247,7 +247,7 @@ fun FTPConScreen(
 
             // 显示当前路径 (可选)
             Text(
-                text = "当前路径: /$currentPath",
+                "当前路径: ${if (currentPath.startsWith("/")) currentPath else "/$currentPath"}",
                 color = Color.LightGray,
 
                 style = MaterialTheme.typography.bodyMedium,

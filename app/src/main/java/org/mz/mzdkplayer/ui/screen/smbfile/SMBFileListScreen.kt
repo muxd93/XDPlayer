@@ -107,12 +107,13 @@ fun SMBFileListScreen(
     // 新增：电影信息状态
     val focusedMovie by movieViewModel.focusedMovie.collectAsState()
     val settingsState by settingsViewModel.uiState.collectAsState()
-// 在 Composable 顶部获取状态
+
     val isScanning by movieViewModel.isScanning.collectAsState()
     val currentScanIndex by movieViewModel.currentScanIndex.collectAsState() // 新增：引入当前进度
     val totalScanCount by movieViewModel.totalScanCount.collectAsState() // 新增：引入总数
 // ...
     var seaText by remember { mutableStateOf("") }
+    var mediaId by remember { mutableIntStateOf(-1) }
     //  新增：过滤后的文件列表
     val filteredFiles by remember(files, seaText) {
         derivedStateOf {
@@ -196,7 +197,7 @@ fun SMBFileListScreen(
             movieViewModel.clearFocusedMovie()
         }
     }
-    var mediaId by remember { mutableIntStateOf(-1) }
+
     // 清理资源
     DisposableEffect(Unit) {
         onDispose {
@@ -496,7 +497,8 @@ fun SMBFileListScreen(
                                 modifier = Modifier.weight(1f), // 关键：让中间区域占据所有剩余空间
                                 horizontalAlignment = Alignment.CenterHorizontally,
                                 verticalArrangement = Arrangement.Center // 海报在剩余空间里垂直居中
-                            ) {
+                            )
+                            {
 
                                 when (val movieResult = focusedMovie) {
                                     is Resource.Success -> {

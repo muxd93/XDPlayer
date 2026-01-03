@@ -437,7 +437,8 @@ fun MzDKPlayerAPP(externalVideoUri: Uri?) {
                 WebDavFileListScreen(
                     path,
                     mainNavController,
-                    WebDavConnection("1", connectionName, path, username, pw)
+                    WebDavConnection("1", connectionName, path, username, pw),
+                    settingsVM
                 )
             }
         }
@@ -471,7 +472,8 @@ fun MzDKPlayerAPP(externalVideoUri: Uri?) {
                         URLDecoder.decode(encodedUsername, "UTF-8"),
                         URLDecoder.decode(encodedPassword, "UTF-8"),
                         shareName = URLDecoder.decode(encodedShareName, "UTF-8"),
-                    )
+                    ),
+                    settingsVM
                 )
             }
         }

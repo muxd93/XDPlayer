@@ -1,5 +1,6 @@
 package org.mz.mzdkplayer.ui.screen.library
 
+import android.widget.Toast
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -20,6 +21,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyHorizontalGrid
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.magnifier
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -87,32 +90,59 @@ fun MovieLibraryScreen(
     val isMoviesEmpty = movies.itemCount == 0
     // 控制弹窗显示
     var showEditDialog by remember { mutableStateOf(false) }
-    // 在版本加载完成后，检查版本数量
+
+    // 开头获取 context
+    val context = LocalContext.current
+    // 在开头定义一个临时状态
+    var isLongClickAction by remember { mutableStateOf(false) }
+    // 修改后的 LaunchedEffect
     LaunchedEffect(movieVersions.size, checkVersionsAfterLoad) {
         if (checkVersionsAfterLoad && movieVersions.isNotEmpty()) {
-            when (movieVersions.size) {
-                1 -> {
-                    val version = movieVersions.first()
-                    val encodedUri = URLEncoder.encode(version.videoUri, "UTF-8")
-                    val encodedFileName = URLEncoder.encode(version.fileName, "UTF-8")
-                    val connectionName = URLEncoder.encode(version.connectionName, "UTF-8")
-                    if (!settingsState.hideDetails) {
-                    navController.navigate("MovieDetails/$encodedUri/${version.dataSourceType}/$encodedFileName/$connectionName/${version.tmdbId}")
-                    }
-                    else{
-                        navController.navigate("VideoPlayer/$encodedUri/${version.dataSourceType}/$encodedFileName/$connectionName")
-                    }
-                    checkVersionsAfterLoad = false
-                    viewModel.clearSelectedMovieVersions()
+            val versionCount = movieVersions.size
+
+            if (isLongClickAction) {
+                // === 修改后的长按逻辑 ===
+                if (versionCount == 1) {
+                    // 只有一个版本，允许修改
+                    showEditDialog = true
+                } else {
+                    // 【核心修改】多个版本时，不弹窗，直接提示用户
+                    Toast.makeText(
+                        context,
+                        "检测到多个版本，请先点击进入版本选择界面，再长按对应文件进行修改",
+                        Toast.LENGTH_SHORT
+                    ).show()
+
+                    // 可选：如果你还是想让用户选版本，但不直接进修改逻辑，可以注释掉下面这行
+                    // showVersionDialog = true
                 }
-                in 2..Int.MAX_VALUE -> {
-                    showVersionDialog = true
-                    checkVersionsAfterLoad = false
+                isLongClickAction = false
+                checkVersionsAfterLoad = false
+            } else {
+                // === 处理点击播放逻辑 ===
+                when (versionCount) {
+                    1 -> {
+                        val version = movieVersions.first()
+                        val encodedUri = URLEncoder.encode(version.videoUri, "UTF-8")
+                        val encodedFileName = URLEncoder.encode(version.fileName, "UTF-8")
+                        val connectionName = URLEncoder.encode(version.connectionName, "UTF-8")
+                        if (!settingsState.hideDetails) {
+                            navController.navigate("MovieDetails/$encodedUri/${version.dataSourceType}/$encodedFileName/$connectionName/${version.tmdbId}")
+                        }
+                        else{
+                            navController.navigate("VideoPlayer/$encodedUri/${version.dataSourceType}/$encodedFileName/$connectionName")
+                        }
+                        checkVersionsAfterLoad = false
+                        viewModel.clearSelectedMovieVersions()
+                    }
+                    in 2..Int.MAX_VALUE -> {
+                        showVersionDialog = true
+                        checkVersionsAfterLoad = false
+                    }
                 }
             }
         }
     }
-
     // 如果刚进入页面没有焦点，默认尝试获取列表第一个作为背景
     LaunchedEffect(movies.itemSnapshotList.items) {
         if (focusedMovie == null && movies.itemCount > 0) {
@@ -231,7 +261,18 @@ fun MovieLibraryScreen(
                                     viewModel.loadMovieVersions(movie.tmdbId)
                                     checkVersionsAfterLoad = true
                                 },
-                                onLongClick = {showEditDialog=true}
+                                onLongClick = {// --- 修改后的长按逻辑 ---
+                                    selectedMovieTitle = movie.title
+                                    // 1. 同步记录当前电影并请求版本信息
+                                    focusedMovie = movie
+                                    viewModel.loadMovieVersions(movie.tmdbId)
+
+                                    // 2. 这里利用一个临时逻辑：由于 movieVersions 是在 ViewModel 里的 StateFlow
+                                    // 我们需要等待它加载。但为了用户体验，我们可以直接在 LaunchedEffect 里监听
+                                    // 或者简单化处理：标记当前是“长按触发”的检查
+                                    isLongClickAction = true
+                                    checkVersionsAfterLoad = true
+                                }
                             )
                         }
                     }
@@ -378,24 +419,33 @@ fun MovieVersionSelectionDialog(
             modifier = Modifier
                 .widthIn(max = 600.dp)
                 .height(400.dp),
-            shape = MaterialTheme.shapes.large,
+            shape = MaterialTheme.shapes.medium,
             colors = SurfaceDefaults.colors(
                 containerColor = Color(0xFF1E1E1E)
             )
         ) {
-            Column(modifier = Modifier.padding(24.dp)) {
+            Column(modifier = Modifier.padding(24.dp).widthIn(max = 600.dp)
+                .height(400.dp),) {
                 Text(
                     text = "$title - 选择版本",
-                    style = MaterialTheme.typography.headlineSmall,
+                    style = MaterialTheme.typography.bodyLarge,
                     color = Color.White,
+                    maxLines = 2,
                     fontWeight = FontWeight.Bold
                 )
-                Spacer(modifier = Modifier.height(16.dp))
-
+                // --- 新增提示文字 ---
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    text = "提示：长按下方版本可修改该文件的 TMDB 信息",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = Color.LightGray // 使用主题色或淡蓝色强调
+                )
+                Spacer(modifier = Modifier.height(6.dp))
                 if (versions.isEmpty()) {
                     Text("加载中...", color = Color.Gray)
                 } else {
                     LazyColumn(
+                        Modifier.weight(1f),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         items(versions) { version ->
@@ -418,9 +468,6 @@ fun MovieVersionSelectionDialog(
                                         fontWeight = FontWeight.Bold
                                     )
                                 },
-                                trailingContent = {
-                                    Text("选择", color = Color.LightGray)
-                                }
                             )
                         }
                     }
