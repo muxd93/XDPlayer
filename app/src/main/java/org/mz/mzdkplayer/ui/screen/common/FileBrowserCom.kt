@@ -1,17 +1,24 @@
 package org.mz.mzdkplayer.ui.screen.common
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -19,6 +26,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.painter.Painter
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -29,15 +37,16 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Popup
 import androidx.tv.material3.ClickableSurfaceDefaults
 import androidx.tv.material3.Icon
-import androidx.tv.material3.LocalContentColor
 import androidx.tv.material3.Surface
 import androidx.tv.material3.Text
+import coil3.compose.AsyncImage
 import org.mz.mzdkplayer.R
+import org.mz.mzdkplayer.data.model.MediaItem
+import org.mz.mzdkplayer.data.repository.Resource
 import org.mz.mzdkplayer.tool.Tools
+import org.mz.mzdkplayer.tool.Tools.VideoBigIcon
 import org.mz.mzdkplayer.tool.Tools.formatFileSize
-import org.mz.mzdkplayer.ui.videoplayer.components.VideoPlayerState
 import kotlin.Boolean
-import kotlin.js.ExperimentalJsFileName
 
 @Composable
 fun FileSize(isDirectory: Boolean = true,fileSize: Long = 1L){
@@ -114,7 +123,7 @@ fun MediaReleaseDate(releaseDate: String?){
         text = releaseDate?.substring(0, 4) ?: "N/A",
         color = Color.White,
         fontWeight = FontWeight.Bold,
-        fontSize = 18.sp, // 稍微减小字体
+        fontSize = 16.sp, // 稍微减小字体
         maxLines = 2,
         overflow = TextOverflow.Ellipsis,
         textAlign = TextAlign.Center
@@ -211,4 +220,94 @@ fun CirCleIconButton(
             }
         }
     }
+}
+
+@Composable
+fun MediaPreviewSection(
+    focusedMovie: Resource<MediaItem?>,
+    focusedFileName: String?,
+    focusedIsDir: Boolean,
+    modifier: Modifier = Modifier,
+    onMediaIdResolved: (Int) -> Unit // 新增回调：当解析出电影 ID 时通知外部
+) {
+        Column(
+            modifier = modifier, // 使用传入的 modifier
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Box(
+                modifier = Modifier
+                    .weight(0.8f)
+                    .fillMaxWidth()
+                    .padding(top = 20.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                when (focusedMovie) {
+                    is Resource.Success -> {
+                        val movie = focusedMovie.data
+                        if (movie != null) {
+                            // 关键点：通过 SideEffect 或直接在逻辑中触发回调
+                            // 这样父组件的 mediaId 就会保持同步
+                            LaunchedEffect(movie.id) {
+                                onMediaIdResolved(movie.id)
+                            }
+
+                            if (movie.posterPath != null) {
+                                Box(
+                                    Modifier.border(
+                                        width = 2.dp,
+                                        color = Color.Gray.copy(alpha = 0.5f),
+                                        shape = RoundedCornerShape(20.dp)
+                                    )
+                                ) {
+                                    AsyncImage(
+                                        model = "https://image.tmdb.org/t/p/w500${movie.posterPath}",
+                                        contentDescription = movie.title,
+                                        contentScale = ContentScale.Fit,
+                                        modifier = Modifier
+                                            .fillMaxHeight()
+                                            .align(Alignment.Center)
+                                            .clip(RoundedCornerShape(20.dp))
+                                    )
+                                }
+                            } else {
+                                VideoBigIcon(focusedIsDir, focusedFileName, Modifier.fillMaxWidth().height(200.dp))
+                            }
+                        } else {
+                            // 如果没有匹配到电影，通知父组件重置 mediaId
+                            LaunchedEffect(Unit) { onMediaIdResolved(-1) }
+                            VideoBigIcon(focusedIsDir, focusedFileName, Modifier.fillMaxWidth().height(200.dp))
+                        }
+                    }
+                    is Resource.Loading -> {
+                        MediaInfoLoading()
+                    }
+                    is Resource.Error -> {
+                        LaunchedEffect(Unit) { onMediaIdResolved(-1) }
+                        VideoBigIcon(focusedIsDir, focusedFileName, Modifier.fillMaxWidth().height(200.dp))
+                    }
+                }
+            }
+
+            // --- 文字信息区 ---
+            Box(
+                modifier = Modifier.weight(0.2f).fillMaxWidth(),
+                contentAlignment = Alignment.Center
+            ) {
+                val movie = (focusedMovie as? Resource.Success)?.data
+                if (movie != null) {
+                    Column(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        MediaTitle(movie.title)
+                        Spacer(modifier = Modifier.height(4.dp))
+                        MediaReleaseDate(movie.releaseDate)
+                    }
+                } else {
+                    MediaFocusedFileName(focusedFileName)
+                }
+            }
+        }
+
 }

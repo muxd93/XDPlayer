@@ -337,7 +337,7 @@ fun MzDKPlayerAPP(externalVideoUri: Uri?) {
             if (encodedPath != null) {
                 val path = URLDecoder.decode(encodedPath, "UTF-8")
                 Log.d("encodedPath", path)
-                LocalFileListScreen(path, mainNavController)
+                LocalFileListScreen(path, mainNavController,settingsVM)
 
             }
         }
@@ -422,7 +422,7 @@ fun MzDKPlayerAPP(externalVideoUri: Uri?) {
 
                 val path = URLDecoder.decode(encodedPath, "UTF-8")
                 Log.d("encodedPath", path)
-                SMBFileListScreen(path, mainNavController, connectionName)
+                SMBFileListScreen(path, mainNavController, connectionName,settingsVM)
             }
         }
         composable("WebDavFileListScreen/{path}/{username}/{pw}/{connectionName}") { backStackEntry ->
@@ -496,7 +496,9 @@ fun MzDKPlayerAPP(externalVideoUri: Uri?) {
 
                         URLDecoder.decode(encodedIp, "UTF-8"),
                         URLDecoder.decode(encodedShareName, "UTF-8"),
-                    )
+
+                    ),
+                    settingsVM
                 )
             }
         }
@@ -510,7 +512,8 @@ fun MzDKPlayerAPP(externalVideoUri: Uri?) {
                 HTTPLinkFileListScreen(
                     URLDecoder.decode(newSubPath, "UTF-8"),
                     mainNavController,
-                    connectionName
+                    connectionName,
+                    settingsVM
                 )
             }
         }

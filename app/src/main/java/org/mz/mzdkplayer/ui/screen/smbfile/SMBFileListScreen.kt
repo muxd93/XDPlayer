@@ -11,10 +11,12 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
@@ -69,6 +71,7 @@ import org.mz.mzdkplayer.ui.screen.common.FileSize
 import org.mz.mzdkplayer.ui.screen.common.LoadingScreen
 import org.mz.mzdkplayer.ui.screen.common.MediaFocusedFileName
 import org.mz.mzdkplayer.ui.screen.common.MediaInfoLoading
+import org.mz.mzdkplayer.ui.screen.common.MediaPreviewSection
 import org.mz.mzdkplayer.ui.screen.common.MediaReleaseDate
 import org.mz.mzdkplayer.ui.screen.common.MediaTitle
 import org.mz.mzdkplayer.ui.screen.common.MyFileDialog
@@ -90,7 +93,7 @@ fun SMBFileListScreen(
     path: String?,
     navController: NavHostController,
     connectionName: String = "",
-    settingsViewModel: SettingsViewModel = viewModel()
+        settingsViewModel: SettingsViewModel = viewModel()
 ) {
     val context = LocalContext.current
     val viewModel: SMBConViewModel = viewModel()
@@ -111,7 +114,11 @@ fun SMBFileListScreen(
     val isScanning by movieViewModel.isScanning.collectAsState()
     val currentScanIndex by movieViewModel.currentScanIndex.collectAsState() // 新增：引入当前进度
     val totalScanCount by movieViewModel.totalScanCount.collectAsState() // 新增：引入总数
-// ...
+    // 获取 AudioViewModel
+    val audioViewModel: AudioViewModel = viewModelWithFactory {
+        RepositoryProvider.createAudioViewModel() // 不需要 context 了
+    }
+    val isAudioScanning by audioViewModel.isScanning.collectAsState()
     var seaText by remember { mutableStateOf("") }
     var mediaId by remember { mutableIntStateOf(-1) }
     //  新增：过滤后的文件列表
@@ -179,9 +186,8 @@ fun SMBFileListScreen(
     }
 
     // 处理焦点变化和媒体播放
-    // 处理焦点变化和媒体播放
-    LaunchedEffect(focusedFileName, focusedIsDir, focusedIsVideo) {
-        if (focusedFileName != null && !focusedIsDir && focusedIsVideo) {
+    LaunchedEffect(focusedFileName, focusedIsDir, focusedIsVideo,settingsState.smb) {
+        if (focusedFileName != null && !focusedIsDir && focusedIsVideo && settingsState.smb) {
             // 非目录文件，触发电影搜索
             // [修改] 传入 focusedMediaUri 以便查询数据库
             Log.d("SMBFileListScreen", "触发电影搜索: $focusedFileName")
@@ -206,11 +212,7 @@ fun SMBFileListScreen(
             viewModel.disconnectSMB()
         }
     }
-// 获取 AudioViewModel
-    val audioViewModel: AudioViewModel = viewModelWithFactory {
-        RepositoryProvider.createAudioViewModel() // 不需要 context 了
-    }
-    val isAudioScanning by audioViewModel.isScanning.collectAsState()
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -330,25 +332,30 @@ fun SMBFileListScreen(
                                                                 "SMBFileListScreen",
                                                                 "connectionName:$connectionName"
                                                             )
-                                                            Log.d(
-                                                                "SMBFileListScreen",
-                                                                "movieId:$mediaId"
-                                                            ) // 假设 mediaId 在外部作用域
+//                                                            Log.d(
+//                                                                "SMBFileListScreen",
+//                                                                "movieId:$mediaId"
+//                                                            ) // 假设 mediaId 在外部作用域
 
                                                             // 检查是否有媒体信息（mediaId > 0, 且是焦点文件, 且未隐藏详情）
                                                             if (mediaId > 0 && focusedFileName == file.name && !settingsState.hideDetails) {
-                                                                val mediaInfoFN =
-                                                                    MediaInfoExtractorFormFileName.extract(
-                                                                        file.name
-                                                                    )
-                                                                val route =
-                                                                    if (mediaInfoFN.mediaType == "movie") {
+                                                                // 💡 核心改动：从当前已经加载成功的 focusedMovie 中获取信息
+                                                                val currentMedia = (focusedMovie as? Resource.Success)?.data
+                                                                if (currentMedia != null) {
+                                                                    val route = if (currentMedia.isMovie) {
+                                                                        // 电影路由
                                                                         "MovieDetails/$encodedUri/SMB/$encodedFileName/${connectionName}/$mediaId"
                                                                     } else {
-                                                                        // 注意：这里假设 season/episode 可以安全地转换为 Int
-                                                                        "TVSeriesDetails/$encodedUri/SMB/$encodedFileName/${connectionName}/$mediaId/${mediaInfoFN.season.toInt()}/${mediaInfoFN.episode.toInt()}"
+                                                                        // 剧集路由：优先使用 currentMedia 里的季集信息，如果没有则降级使用解析器（保证健壮性）
+                                                                        val s = currentMedia.seasonNumber ?: 1
+                                                                        val e = currentMedia.episodeNumber ?: 1
+                                                                        "TVSeriesDetails/$encodedUri/SMB/$encodedFileName/${connectionName}/$mediaId/$s/$e"
                                                                     }
-                                                                navController.navigate(route)
+                                                                    navController.navigate(route)
+                                                                } else {
+                                                                    // 如果虽然有 mediaId 但对象为空（理论不应发生），降级直接播放
+                                                                    navController.navigate("VideoPlayer/$encodedUri/SMB/$encodedFileName/${connectionName}")
+                                                                }
                                                             } else {
                                                                 // 没有电影信息，直接播放
                                                                 navController.navigate("VideoPlayer/$encodedUri/SMB/$encodedFileName/${connectionName}")
@@ -439,12 +446,7 @@ fun SMBFileListScreen(
                                                                         file.name
                                                                     )
                                                                 )
-                                                            focusedMediaUri =
-                                                                "smb://${file.username}:${file.password}@${file.server}/${file.share}${file.fullPath}"
-//                                                            Log.d(
-//                                                                "SMBFileListScreen",
-//                                                                "焦点变化: ${file.name}, 是目录: $focusedMediaUri"
-//                                                            )
+                                                            focusedMediaUri = "smb://${file.username}:${file.password}@${file.server}/${file.share}${file.fullPath}"
                                                         }
                                                     },
                                                 scale = ListItemDefaults.scale(
@@ -491,100 +493,26 @@ fun SMBFileListScreen(
                                 placeholder = "请输入文件名",
                                 textStyle = TextStyle(color = Color.White),
                             )
-
+                            // --- 关键修改：添加弹簧 1 ---
+                           // Spacer()
                             // 2. 中间的海报和文字区域（包裹在一个 Column 里）
-                            Column(
-                                modifier = Modifier.weight(1f), // 关键：让中间区域占据所有剩余空间
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.Center // 海报在剩余空间里垂直居中
+                            MediaPreviewSection(
+                                focusedMovie = focusedMovie,
+                                focusedFileName = focusedFileName,
+                                focusedIsDir = focusedIsDir,
+                                modifier = Modifier.weight(1f),
+                                onMediaIdResolved = { id ->
+                                    mediaId = id // 更新父组件持有的状态，供 ListItem 点击逻辑使用
+                                }
                             )
-                            {
-
-                                when (val movieResult = focusedMovie) {
-                                    is Resource.Success -> {
-                                        val movie = movieResult.data
-
-                                        if (movie != null && movie.posterPath != null) {
-                                            mediaId = movie.id
-                                            // 显示电影海报
-                                            Box(
-                                                Modifier
-                                                    .widthIn(180.dp, 200.dp)
-                                                    .border(
-                                                        width = 2.dp,
-                                                        color = Color.Gray.copy(alpha = 0.5f),
-                                                        shape = RoundedCornerShape(20.dp)
-                                                    )
-                                            ) {
-                                                AsyncImage(
-                                                    model = "https://image.tmdb.org/t/p/w500${movie.posterPath}",
-                                                    contentDescription = movie.title,
-                                                    contentScale = ContentScale.Fit,
-                                                    modifier = Modifier
-                                                        .fillMaxWidth()
-                                                        .clip(RoundedCornerShape(20.dp)) // 增大圆角
-                                                )
-                                            }
-
-                                        } else {
-                                            // 没有电影海报，显示默认视频图标
-                                            VideoBigIcon(
-                                                focusedIsDir,
-                                                focusedFileName,
-                                                modifier = Modifier
-                                                    .fillMaxWidth()
-                                                    .height(200.dp)
-
-                                            )
-                                        }
-                                    }
-
-                                    is Resource.Loading -> {
-                                        MediaInfoLoading()
-                                    }
-
-                                    is Resource.Error -> {
-                                        VideoBigIcon(
-                                            focusedIsDir,
-                                            focusedFileName,
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .height(200.dp)
-
-                                        )
-                                    }
-                                }
-
-                                // 电影信息区域 - 居中显示
-                                when (val movieResult = focusedMovie) {
-                                    is Resource.Success -> {
-                                        val movie = movieResult.data
-                                        if (movie != null) {
-                                            Column(
-                                                modifier = Modifier
-                                                    .fillMaxWidth()
-                                                    .padding(horizontal = 16.dp),
-                                                horizontalAlignment = Alignment.CenterHorizontally
-                                            ) {
-                                                MediaTitle(movie.title)
-                                                MediaReleaseDate(movie.releaseDate)
-                                            }
-                                        } else {
-                                            MediaFocusedFileName(focusedFileName)
-                                        }
-                                    }
-
-                                    else -> {
-                                        MediaFocusedFileName(focusedFileName)
-                                    }
-                                }
-                            }
+                            // --- 关键修改：添加弹簧 2 ---
+                            //Spacer(modifier = Modifier.weight(1f))
                             // 3. 底部的进度和按钮区域
                             // 不再嵌套在上面的 Column 里，而是直接放在最外层 Column 的底部
                             Column(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(bottom = 16.dp), // 距离底部边缘一点间距
+                                    .padding(bottom = 10.dp), // 距离底部边缘一点间距
                                 horizontalAlignment = Alignment.CenterHorizontally
                             )
                             {
@@ -592,7 +520,7 @@ fun SMBFileListScreen(
 
                                         // 进度显示区：固定高度 30.dp 左右，避免布局跳动
                                         Box(
-                                            modifier = Modifier.height(30.dp),
+                                            modifier = Modifier.heightIn(0.dp,30.dp).padding(bottom = 5.dp),
                                             contentAlignment = Alignment.Center
                                         ) {
                                             val progressText = when {
@@ -604,11 +532,12 @@ fun SMBFileListScreen(
                                                 Text(text = it, color = Color.Gray, fontSize = 12.sp)
                                             }
                                         }
-// 按钮行
+                                // 按钮行
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterHorizontally),
-                                ) {
+                                )
+                                {
                                         // 按钮行
                                         // --- 视频扫描按钮 ---
                                         CirCleIconButton(
@@ -640,9 +569,7 @@ fun SMBFileListScreen(
                                                 // 2. 构建数据列表 Pair(fileName, fullUri)
                                                 // 注意：URI 的构建规则必须和 LazyColumn 里点击时的规则完全一致
                                                 val scanList = videoFilesToScan.map { file ->
-                                                    val uri =
-                                                        "smb://${file.username}:${file.password}@${file.server}/${file.share}${file.fullPath}"
-                                                    file.name to uri
+                                                    file.name to "smb://${file.username}:${file.password}@${file.server}/${file.share}${file.fullPath}"
                                                 }
 
                                                 // 3. 调用 ViewModel 开始后台任务

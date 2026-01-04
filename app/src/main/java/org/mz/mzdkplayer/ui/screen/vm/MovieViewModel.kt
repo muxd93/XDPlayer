@@ -127,6 +127,53 @@ class MovieViewModel(private val repository: TmdbRepository,private val mediaDao
             }
         }
     }
+    fun getFocusedInfo(
+        movieName: String?,
+        isDirectory: Boolean,
+        videoUri: String,
+        dataSourceType: String,
+        connectionName: String
+    ) {
+        if (isDirectory) {
+            _focusedMovie.value = Resource.Success(null)
+            return
+        }
+        viewModelScope.launch(Dispatchers.IO) {
+            // 1. 先检查本地数据库
+            val cachedMedia = mediaDao.getMediaByUri(videoUri)
+            if (cachedMedia != null) {
+                Log.d("MovieViewModel", "Hit Cache for: $movieName")
+                _focusedMovie.value = Resource.Success(cachedMedia.toMediaItem())
+
+                // [优化] 如果缓存里只是基础信息(isDetailsLoaded=false)，这里可以静默去更新一下详情
+                // 如果不需要自动补全详情，可以把下面这段 if 去掉
+                if (!cachedMedia.isDetailsLoaded) {
+                    val mediaInfo = MediaInfoExtractorFormFileName.extract(movieName ?: "")
+                    searchAndFetchFullDetails(mediaInfo, videoUri, dataSourceType, fileName = movieName ?: "", connectionName)
+                    // 更新完后重新发个通知给 UI
+                    val updated = mediaDao.getMediaByUri(videoUri)
+                    if (updated != null) _focusedMovie.value = Resource.Success(updated.toMediaItem())
+                }
+                return@launch
+            }
+        }
+    }
+    fun getFocusedMediaInfoIsExisted(
+        isDirectory: Boolean,
+        videoUri: String,
+    ): MediaCacheEntity?{
+        if (isDirectory) {
+            _focusedMovie.value = Resource.Success(null)
+            return null
+        }
+        var re:MediaCacheEntity ?= null
+        viewModelScope.launch(Dispatchers.IO) {
+            // 1. 先检查本地数据库
+            val cachedMedia = mediaDao.getMediaByUri(videoUri)
+            re = cachedMedia
+        }
+        return re
+    }
     /**
      * 获取电影详情 (带缓存更新)
      */

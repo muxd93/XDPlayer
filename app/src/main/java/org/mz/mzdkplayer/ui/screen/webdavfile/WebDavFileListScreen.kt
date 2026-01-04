@@ -159,8 +159,8 @@ fun WebDavFileListScreen(
             else -> {}
         }
     }
-    LaunchedEffect(focusedFileName, focusedIsDir, focusedIsVideo) {
-        if (focusedFileName != null && !focusedIsDir && focusedIsVideo) {
+    LaunchedEffect(focusedFileName, focusedIsDir, focusedIsVideo,settingsState.webdav) {
+        if (focusedFileName != null && !focusedIsDir && focusedIsVideo && settingsState.webdav) {
             Log.d("WebDavFileListScreen", "触发电影搜索: $focusedFileName")
 
             // 非目录文件，触发电影搜索

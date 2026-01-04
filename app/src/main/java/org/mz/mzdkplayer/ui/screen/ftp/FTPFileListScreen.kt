@@ -162,7 +162,7 @@ fun FTPFileListScreen(
         }
     }
 // 处理焦点变化和媒体播放
-    LaunchedEffect(focusedFileName, focusedIsDir, focusedIsVideo) {
+    LaunchedEffect(focusedFileName, focusedIsDir, focusedIsVideo,settingsState.ftp) {
         if (focusedFileName != null && !focusedIsDir && focusedIsVideo && settingsState.ftp) {
             // 非目录文件，触发电影搜索
             // [修改] 传入 focusedMediaUri 以便查询数据库
