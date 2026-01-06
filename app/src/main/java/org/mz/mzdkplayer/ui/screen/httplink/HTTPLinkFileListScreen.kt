@@ -170,20 +170,36 @@ fun HTTPLinkFileListScreen(
     }
 // 处理焦点变化和媒体播放
     LaunchedEffect(focusedFileName, focusedIsDir, focusedIsVideo, settingsState.http) {
-        if (focusedFileName != null && !focusedIsDir && focusedIsVideo && settingsState.http) {
-            // 非目录文件，触发电影搜索
-            // [修改] 传入 focusedMediaUri 以便查询数据库
-            Log.d("HTTPFileListScreen", "触发电影搜索: $focusedFileName")
+        // 1. 基础校验：如果是目录、无文件名、或者不是视频，直接清空信息
+        if (focusedFileName == null || focusedIsDir || !focusedIsVideo) {
+            movieViewModel.clearFocusedMovie()
+            return@LaunchedEffect
+        }
+        // 2. 根据设置决定策略
+        // settingsState.http 为 false 代表 "禁止自动刮削/仅本地数据" (防止重复入库)
+        if (settingsState.http) {
+            // === 模式 A：自动刮削 (主数据源) ===
+            // 场景：这是用户的主要观看路径，允许自动联网获取信息。
+            Log.d("HTTPFileListScreen", "自动模式: 触发搜索/刮削: $focusedFileName")
             movieViewModel.searchFocusedMovie(
-                focusedFileName!!,
-                false,
-                focusedMediaUri,
+                movieName = focusedFileName,
+                isDirectory = false,
+                videoUri = focusedMediaUri,
                 dataSourceType = "HTTP",
                 connectionName = connectionName
             )
+
         } else {
-            // 目录或无焦点，清空电影信息
-            movieViewModel.clearFocusedMovie()
+            // === 模式 B：仅查询数据库 (防重复) ===
+            // 场景：用户不希望此协议自动产生新数据，但如果之前"手动批量扫描"过，这里应该显示出来。
+            Log.d("HTTPFileListScreen", "禁止自动刮削模式: 仅查询数据库: $focusedFileName")
+            movieViewModel.getFocusedInfo(
+                movieName = focusedFileName,
+                isDirectory = false,
+                videoUri = focusedMediaUri,
+                dataSourceType = "HTTP",
+                connectionName = connectionName
+            )
         }
     }
     DisposableEffect(Unit) {

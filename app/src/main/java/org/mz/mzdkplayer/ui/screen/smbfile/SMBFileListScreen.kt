@@ -187,20 +187,39 @@ fun SMBFileListScreen(
 
     // 处理焦点变化和媒体播放
     LaunchedEffect(focusedFileName, focusedIsDir, focusedIsVideo,settingsState.smb) {
-        if (focusedFileName != null && !focusedIsDir && focusedIsVideo && settingsState.smb) {
+        // 1. 基础校验：如果是目录、无文件名、或者不是视频，直接清空信息
+        if (focusedFileName == null || focusedIsDir || !focusedIsVideo) {
+            movieViewModel.clearFocusedMovie()
+            return@LaunchedEffect
+        }
+
+        // 2. 根据设置决定策略
+        // settingsState.smb 为 false 代表 "禁止自动刮削/仅本地数据" (防止重复入库)
+        if (settingsState.smb) {
+            // === 模式 A：自动刮削 (主数据源) ===
+            // 场景：这是用户的主要观看路径，允许自动联网获取信息。
             // 非目录文件，触发电影搜索
             // [修改] 传入 focusedMediaUri 以便查询数据库
             Log.d("SMBFileListScreen", "触发电影搜索: $focusedFileName")
             movieViewModel.searchFocusedMovie(
-                focusedFileName!!,
+                focusedFileName,
                 false,
                 focusedMediaUri,
                 dataSourceType = "SMB",
                 connectionName = connectionName
             )
+
         } else {
-            // 目录或无焦点，清空电影信息
-            movieViewModel.clearFocusedMovie()
+            // === 模式 B：仅查询数据库 (防重复) ===
+            // 场景：用户不希望此协议自动产生新数据，但如果之前"手动批量扫描"过，这里应该显示出来。
+            Log.d("SMBFileListScreen", "禁止自动刮削模式: 仅查询数据库: $focusedFileName")
+            movieViewModel.getFocusedInfo(
+                movieName = focusedFileName,
+                isDirectory = false,
+                videoUri = focusedMediaUri,
+                dataSourceType = "SMB",
+                connectionName = connectionName
+            )
         }
     }
 
@@ -347,8 +366,8 @@ fun SMBFileListScreen(
                                                                         "MovieDetails/$encodedUri/SMB/$encodedFileName/${connectionName}/$mediaId"
                                                                     } else {
                                                                         // 剧集路由：优先使用 currentMedia 里的季集信息，如果没有则降级使用解析器（保证健壮性）
-                                                                        val s = currentMedia.seasonNumber ?: 1
-                                                                        val e = currentMedia.episodeNumber ?: 1
+                                                                        val s = currentMedia.seasonNumber
+                                                                        val e = currentMedia.episodeNumber
                                                                         "TVSeriesDetails/$encodedUri/SMB/$encodedFileName/${connectionName}/$mediaId/$s/$e"
                                                                     }
                                                                     navController.navigate(route)
@@ -547,42 +566,50 @@ fun SMBFileListScreen(
                                                 "正在获取信息 $currentScanIndex/$totalScanCount"
                                             else "批量添加到视频库",
                                             onClick = {
-                                                // 1. 过滤出所有的视频文件 (不递归，只取当前层级)
-                                                val videoFilesToScan = files.filter { file ->
-                                                    !file.isDirectory &&
-                                                            Tools.containsVideoFormat(
-                                                                Tools.extractFileExtension(
-                                                                    file.name
-                                                                )
-                                                            )
-                                                }
-
-                                                if (videoFilesToScan.isEmpty()) {
+                                                if (!settingsState.smb) {
                                                     Toast.makeText(
                                                         context,
-                                                        "当前目录没有视频文件",
+                                                        "当前数据源未开启刮削功能 请在设置中开启",
                                                         Toast.LENGTH_SHORT
                                                     ).show()
-                                                    return@CirCleIconButton
-                                                }
+                                                } else {
+                                                    // 1. 过滤出所有的视频文件 (不递归，只取当前层级)
+                                                    val videoFilesToScan = files.filter { file ->
+                                                        !file.isDirectory &&
+                                                                Tools.containsVideoFormat(
+                                                                    Tools.extractFileExtension(
+                                                                        file.name
+                                                                    )
+                                                                )
+                                                    }
 
-                                                // 2. 构建数据列表 Pair(fileName, fullUri)
-                                                // 注意：URI 的构建规则必须和 LazyColumn 里点击时的规则完全一致
-                                                val scanList = videoFilesToScan.map { file ->
-                                                    file.name to "smb://${file.username}:${file.password}@${file.server}/${file.share}${file.fullPath}"
-                                                }
+                                                    if (videoFilesToScan.isEmpty()) {
+                                                        Toast.makeText(
+                                                            context,
+                                                            "当前目录没有视频文件",
+                                                            Toast.LENGTH_SHORT
+                                                        ).show()
+                                                        return@CirCleIconButton
+                                                    }
 
-                                                // 3. 调用 ViewModel 开始后台任务
-                                                Toast.makeText(
-                                                    context,
-                                                    "开始后台获取信息，请稍候...",
-                                                    Toast.LENGTH_SHORT
-                                                ).show()
-                                                movieViewModel.batchScrapeVideoInfo(
-                                                    videoList = scanList,
-                                                    dataSourceType = "SMB",
-                                                    connectionName = connectionName
-                                                )
+                                                    // 2. 构建数据列表 Pair(fileName, fullUri)
+                                                    // 注意：URI 的构建规则必须和 LazyColumn 里点击时的规则完全一致
+                                                    val scanList = videoFilesToScan.map { file ->
+                                                        file.name to "smb://${file.username}:${file.password}@${file.server}/${file.share}${file.fullPath}"
+                                                    }
+
+                                                    // 3. 调用 ViewModel 开始后台任务
+                                                    Toast.makeText(
+                                                        context,
+                                                        "开始后台获取信息，请稍候...",
+                                                        Toast.LENGTH_SHORT
+                                                    ).show()
+                                                    movieViewModel.batchScrapeVideoInfo(
+                                                        videoList = scanList,
+                                                        dataSourceType = "SMB",
+                                                        connectionName = connectionName
+                                                    )
+                                                }
                                             }
                                         )
                                         // --- 音乐扫描按钮 ---
@@ -590,40 +617,48 @@ fun SMBFileListScreen(
                                             icon = painterResource(R.drawable.musicnoteadd_24dp),
                                             tooltip = if (isAudioScanning) "正在解析文件名..." else "批量添加到音乐库",
                                             onClick = {
-                                                // 1. 过滤音频文件
-                                                val audioFiles = files.filter {
-                                                    !it.isDirectory && Tools.containsAudioFormat(
-                                                        Tools.extractFileExtension(
-                                                            it.name
-                                                        )
-                                                    )
-                                                }
-
-                                                if (audioFiles.isEmpty()) {
+                                                if (!settingsState.smb) {
                                                     Toast.makeText(
                                                         context,
-                                                        "没有发现音频文件",
+                                                        "当前数据源未开启刮削功能 请在设置中开启",
                                                         Toast.LENGTH_SHORT
                                                     ).show()
-                                                    return@CirCleIconButton
-                                                }
+                                                } else {
+                                                    // 1. 过滤音频文件
+                                                    val audioFiles = files.filter {
+                                                        !it.isDirectory && Tools.containsAudioFormat(
+                                                            Tools.extractFileExtension(
+                                                                it.name
+                                                            )
+                                                        )
+                                                    }
 
-                                                // 2. 只有文件名和URI是必须的
-                                                val list = audioFiles.map {
-                                                    it.name to "smb://${it.username}:${it.password}@${it.server}/${it.share}${it.fullPath}"
-                                                }
+                                                    if (audioFiles.isEmpty()) {
+                                                        Toast.makeText(
+                                                            context,
+                                                            "没有发现音频文件",
+                                                            Toast.LENGTH_SHORT
+                                                        ).show()
+                                                        return@CirCleIconButton
+                                                    }
 
-                                                // 3. 直接调用，瞬间完成
-                                                audioViewModel.batchScrapeAudioInfo(
-                                                    audioList = list,
-                                                    dataSourceType = "SMB",
-                                                    connectionName = connectionName
-                                                )
-                                                Toast.makeText(
-                                                    context,
-                                                    "已在后台添加 ${list.size} 首音乐",
-                                                    Toast.LENGTH_SHORT
-                                                ).show()
+                                                    // 2. 只有文件名和URI是必须的
+                                                    val list = audioFiles.map {
+                                                        it.name to "smb://${it.username}:${it.password}@${it.server}/${it.share}${it.fullPath}"
+                                                    }
+
+                                                    // 3. 直接调用，瞬间完成
+                                                    audioViewModel.batchScrapeAudioInfo(
+                                                        audioList = list,
+                                                        dataSourceType = "SMB",
+                                                        connectionName = connectionName
+                                                    )
+                                                    Toast.makeText(
+                                                        context,
+                                                        "已在后台添加 ${list.size} 首音乐",
+                                                        Toast.LENGTH_SHORT
+                                                    ).show()
+                                                }
                                             }
                                         )
                                     }

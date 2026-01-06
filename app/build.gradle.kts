@@ -16,16 +16,31 @@ android {
         applicationId = "org.mz.mzdkplayer"
         minSdk = 23
         targetSdk = 36
-        versionCode = 17
-        versionName = "1.13"
+        versionCode = 18
+        versionName = "1.13.2"
         ndk {
             //noinspection ChromeOsAbiSupport
-            abiFilters += listOf("armeabi-v7a", "x86")
+            abiFilters += listOf("armeabi-v7a", "arm64-v8a","x86")
         }
         val localProperties = rootProject.file("local.properties")
         val properties = Properties().apply {
             if (localProperties.exists()) {
                 load(localProperties.inputStream())
+            }
+        }
+        splits {
+            // 配置 ABI 拆分
+            abi {
+                // 启用 ABI 拆分
+                isEnable = true
+
+                // 清空默认的所有 ABI 列表，然后指定你需要拆分的架构
+                reset()
+                include("armeabi-v7a", "arm64-v8a")
+
+                // 是否创建一个包含所有架构的“通用包”？
+                // 如果设为 true，会多生成一个全架构的 APK
+                isUniversalApk = true
             }
         }
         val tmdbApiKey = properties.getProperty("TMDB_API_KEY", "")
