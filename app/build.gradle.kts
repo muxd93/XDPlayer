@@ -11,7 +11,14 @@ plugins {
 android {
     namespace = "org.mz.mzdkplayer"
     compileSdk = 36
-
+    packaging {
+        jniLibs {
+            // 设置为 true 意味着 .so 会被压缩进 APK
+            // 这样安装后系统会把 .so 解压到应用的 data 目录
+            // APK 体积会显著减小（回到你看到的 15MB 左右）
+            useLegacyPackaging = true
+        }
+    }
     defaultConfig {
         applicationId = "org.mz.mzdkplayer"
         minSdk = 23
@@ -50,7 +57,7 @@ android {
     buildTypes {
         release {
             isMinifyEnabled = true
-            //isShrinkResources = false
+            isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -99,6 +106,7 @@ dependencies {
     //implementation(libs.androidx.media3.ui)
     implementation(libs.androidx.media3.ui.compose)
     implementation(files("libs/lib-decoder-ffmpeg-release.aar"))
+    implementation(files("libs/libvlc-release.aar"))
     implementation(libs.androidx.palette.ktx)
     implementation(libs.akdanmaku)
     implementation(libs.accompanist.permissions)
@@ -135,7 +143,8 @@ dependencies {
     implementation(libs.commons.net)
     //implementation("androidx.media3:media3-exoplayer-ffmpeg:1.9.0-alpha01")
     //implementation(libs.jcifs)
-
+//    // https://mvnrepository.com/artifact/org.videolan.android/libvlc-all
+//    implementation(libs.libvlc.all)
 // 请检查最新版本
     //implementation(libs.ass.kt)
     //implementation(libs.ass.media.v030beta02)
