@@ -25,6 +25,7 @@ fun VLCVideoPlayerScreen(
     val libVLC = remember {
         val options = arrayListOf("-vvv") // 开启详细日志，方便调试 M2TS 解码
         LibVLC(context, options)
+        //ss
     }
     val mediaPlayer = remember { MediaPlayer(libVLC) }
 
