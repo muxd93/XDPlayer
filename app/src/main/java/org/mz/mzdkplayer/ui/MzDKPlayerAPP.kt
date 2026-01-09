@@ -32,10 +32,12 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.media3.common.util.UnstableApi
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import androidx.navigation.navOptions
 import androidx.tv.material3.DrawerState
 import androidx.tv.material3.DrawerValue
@@ -92,6 +94,7 @@ import org.mz.mzdkplayer.ui.screen.vm.SettingsViewModel
 import org.mz.mzdkplayer.ui.theme.mySideListItemColor
 
 import org.mz.mzdkplayer.ui.videoplayer.VideoPlayerScreen
+import org.mz.mzdkplayer.ui.videoplayer.components.VLCVideoPlayerScreen
 import java.net.URLDecoder
 import java.net.URLEncoder
 
@@ -553,6 +556,19 @@ fun MzDKPlayerAPP(externalVideoUri: Uri?) {
                 currentEpisode = episodeNumber, // 传递集号
                 navController = mainNavController
             )
+        }
+        composable(
+            route = "VLCVideoPlayer/{mediaUri}/{fileName}",
+            arguments = listOf(
+                navArgument("mediaUri") { type = NavType.StringType },
+                navArgument("fileName") { type = NavType.StringType }
+            )
+        ) { backStackEntry ->
+            val mediaUri = backStackEntry.arguments?.getString("mediaUri") ?: ""
+            val fileName = backStackEntry.arguments?.getString("fileName") ?: ""
+
+            // 调用刚才创建的测试界面
+            VLCVideoPlayerScreen(mediaUri = URLDecoder.decode(mediaUri, "UTF-8"), fileName = fileName)
         }
         composable("SMBListScreen") {
             SMBConListScreen(mainNavController, smbListViewModel)
