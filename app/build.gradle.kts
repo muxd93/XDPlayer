@@ -3,7 +3,7 @@ import java.util.Properties
 
 plugins {
     alias(libs.plugins.android.application)
-    alias(libs.plugins.kotlin.android)
+    // alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.ksp)
 }
@@ -27,25 +27,25 @@ android {
                 load(localProperties.inputStream())
             }
         }
-        splits {
-            // 配置 ABI 拆分
-            abi {
-                // 启用 ABI 拆分
-                isEnable = true
 
-                // 清空默认的所有 ABI 列表，然后指定你需要拆分的架构
-                reset()
-                include("armeabi-v7a", "arm64-v8a")
-
-                // 是否创建一个包含所有架构的“通用包”？
-                // 如果设为 true，会多生成一个全架构的 APK
-                isUniversalApk = true
-            }
-        }
         val tmdbApiKey = properties.getProperty("TMDB_API_KEY", "")
         buildConfigField("String", "TMDB_API_KEY", "\"$tmdbApiKey\"")
     }
+    splits {
+        // 配置 ABI 拆分
+        abi {
+            // 启用 ABI 拆分
+            isEnable = true
 
+            // 清空默认的所有 ABI 列表，然后指定你需要拆分的架构
+            reset()
+            include("armeabi-v7a", "arm64-v8a")
+
+            // 是否创建一个包含所有架构的“通用包”？
+            // 如果设为 true，会多生成一个全架构的 APK
+            isUniversalApk = true
+        }
+    }
     buildTypes {
         release {
             isMinifyEnabled = true
@@ -76,7 +76,7 @@ android {
 
 kotlin {
     compilerOptions {
-        jvmTarget.set(JvmTarget.JVM_17)
+        jvmToolchain(21)
         // You can add other compiler options here if needed
     }
 }

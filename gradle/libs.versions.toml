@@ -1,7 +1,7 @@
 [versions]
 accompanistPermissions = "0.37.3"
 
-agp = "8.13.2"
+agp = "9.0.0"
 akdanmaku = "1.0.3"
 
 assMedia = "0.3.0"
@@ -12,20 +12,20 @@ gson = "2.13.2"
 converterGson = "3.0.0"
 jaudiotagger = "3.0.1"
 
-kotlin = "2.3.0"
+kotlin = "2.3.10"
 coreKtx = "1.17.0"
 appcompat = "1.7.1"
-composeBom = "2025.12.01"
+composeBom = "2026.02.00"
 libvlcAll = "3.6.5"
 logbackAndroid = "3.0.0"
 desugarJdkLibs = "2.1.5" # 检查是否有更新版本
-media3UiCompose = "1.9.0"
+media3UiCompose = "1.9.2"
 nanohttpd = "2.3.1"
 nfsClient = "1.1.0"
 coilComposeVersion = "3.3.0"
 coilNetworkOkhttp = "3.3.0"
-pagingCompose = "3.3.6"
-pagingRuntimeKtx = "3.3.6"
+pagingCompose = "3.4.1"
+pagingRuntimeKtx = "3.4.1"
 paletteKtx = "1.0.0"
 roomCompiler = "2.8.4"
 roomKtx = "2.8.4"
@@ -34,13 +34,13 @@ sardineAndroidVersion = "0.9"
 smbj = "0.14.0"
 tvFoundation = "1.0.0-alpha12"
 tvMaterial = "1.0.1"
-media3Ui = "1.9.0"
+media3Ui = "1.9.2"
 lifecycleRuntimeKtx = "2.10.0"
-activityCompose = "1.12.2"
+activityCompose = "1.12.4"
 datastorePreferences = "1.2.0"
-navigationCompose = "2.9.6"
-ui = "1.10.0"
-ksp = "2.3.4"
+navigationCompose = "2.9.7"
+ui = "1.10.3"
+ksp = "2.3.5"
 retrofit = "3.0.0"
 
 [libraries]
@@ -95,7 +95,7 @@ thegrizzlylabs-sardine-android = { module = "com.github.thegrizzlylabs:sardine-a
 desugarJdkLibs = { group = "com.android.tools", name = "desugar_jdk_libs", version.ref = "desugarJdkLibs" }
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
-kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
+# kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 
 ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
