@@ -1,4 +1,5 @@
 # MzDKPlayer - Android TV Local Media Player with Danmaku Support
+English | [中文](README.md)
 
 > GitHub: [https://github.com/mzhsy1/MzDKPlayer](https://github.com/mzhsy1/MzDKPlayer)
 > Gitee Mirror: [https://gitee.com/mzhsy/MzDKPlayer](https://gitee.com/mzhsy/MzDKPlayer)
