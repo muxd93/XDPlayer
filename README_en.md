@@ -65,6 +65,10 @@
 
 > 💡 **Tip 2**: If your device has limited performance, enabling Danmaku while playing 70-80GB Blu-ray files may cause lag.
 
+> 💡 **Tip 3**: If a video fails to play using the default ExoPlayer engine, try switching to the **VLC player engine** in `Settings` -> `Playback & Video` -> `Default Player Engine`.
+
+
+
 ---
 
 ## App Preview
