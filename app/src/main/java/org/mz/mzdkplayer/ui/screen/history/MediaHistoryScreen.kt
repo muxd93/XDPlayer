@@ -1,5 +1,6 @@
 package org.mz.mzdkplayer.ui.screen.history
 
+import android.util.Log
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.*
@@ -110,7 +111,9 @@ fun MediaHistoryScreen(
                                 val encodedUri = URLEncoder.encode(record.mediaUri, "UTF-8")
                                 val encodedFileName = URLEncoder.encode(record.fileName, "UTF-8")
                                 // 导航逻辑
-                                navController.navigate("VideoPlayer/$encodedUri/${record.protocolName}/$encodedFileName/${record.connectionName}")
+                                Log.d("HIS",record.protocolName)
+                                val protocolName = if(record.protocolName == "本地文件") {"LOCAL"} else{record.protocolName}
+                                navController.navigate("VideoPlayer/$encodedUri/${protocolName}/$encodedFileName/${record.connectionName}")
                             }
                         )
                     } else {

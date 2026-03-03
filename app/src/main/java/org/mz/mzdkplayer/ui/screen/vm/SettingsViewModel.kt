@@ -13,7 +13,7 @@ data class SettingsUiState(
     val audioLang: String = "",
     val subLang: String = "",
     val enableTunneling: Boolean = true,
-    val enablePassthrough: Boolean = true,
+    val enablePassthrough: Boolean = false,
     val subFontSize: Float = 22f,
     val subColor: Long = 0xFFFFFFFF,
     val subBgColor: Long = 0x80000000,

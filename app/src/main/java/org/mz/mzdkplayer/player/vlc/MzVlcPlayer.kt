@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import org.mz.mzdkplayer.player.core.IMzPlayer
 import org.mz.mzdkplayer.player.core.MzBasicTrack
 import org.mz.mzdkplayer.player.core.MzVideoTrack
+import org.mz.mzdkplayer.ui.screen.vm.SettingsViewModel
 
 import org.mz.mzdkplayer.ui.screen.vm.VideoPlayerStatus
 import org.videolan.libvlc.LibVLC
@@ -27,19 +28,31 @@ class MzVlcPlayer(
     mediaUri: String,
     // 如果需要，可以把语言偏好也传进来
     private val preferredAudioLang: String? = null,
-    private val preferredTextLang: String? = null
+    private val preferredTextLang: String? = null,
+    settingsViewModel: SettingsViewModel
 ) : IMzPlayer {
-
+    val isPassthroughEnabled = settingsViewModel.uiState.value.enablePassthrough // 获取当前的设置状态
     // 1. 初始化 VLC 命令行参数
     private val options = arrayListOf(
         "-vvv",
         "--http-reconnect",
-        // 如果有隧道模式需求，VLC 对应参数是 mediacodec-hw
-        "--codec=mediacodec_ndk,mediacodec_dr,all"
+        "--mediacodec-dr",
+        "--vout=android_display", // 强制使用安卓原生显示输出，HDR 关键
+        "--no-video-deco",        // 禁用装饰，防止 GLES 混合导致 HDR 失效
+        "--aout=android_audiotrack",
+        "--file-caching=3000",
+        "--network-caching=3000",
+        "--clock-jitter=0",
+        "--clock-synchro=0"
     ).apply {
+        // 如果开启了直通，在全局参数里也加上支持
+        if (isPassthroughEnabled) {
+            add("--spdif")
+        }
         // VLC 的语言设置通常在初始化时通过参数传入
         preferredAudioLang?.let { add("--audio-language=$it") }
         preferredTextLang?.let { add("--sub-language=$it") }
+
     }
 
     private val libVLC = LibVLC(context, options)
@@ -66,16 +79,36 @@ class MzVlcPlayer(
     override var onCuesChanged: ((Any) -> Unit)? = null // VLC 不需要，留空
 
     init {
-        // 设置事件监听器同步状态
-        setupEventListener()
 
-        val media = Media(libVLC, mediaUri.toUri())
+        mediaPlayer.setAudioDigitalOutputEnabled(isPassthroughEnabled)
+        if (isPassthroughEnabled) {
+            mediaPlayer.setAudioOutput("android_audiotrack")
+        }
+        // 设置事件监听器同步状态
+        val media = Media(libVLC, mediaUri.toUri()).apply {
+            setHWDecoderEnabled(true, true)
+            addOption(":codec=mediacodec_ndk")
+
+            // 3. 只有开启直通时，才注入这些 Media Option
+            if (isPassthroughEnabled) {
+                addOption(":audio-passthrough=1")
+                addOption(":spdif=hdmi")
+                addOption(":audio-passthrough=hdmi")
+                // 注意：如果电视不支持 TrueHD，VLC 只要看到这几个参数就会尝试透传
+                // 如果透传失败就会没声音。目前最稳妥是让用户在设置里切开关。
+            } else {
+                addOption(":audio-passthrough=0")
+            }
+
+            addOption(":no-osd")
+            addOption(":network-caching=3000")            // 实验代码里有的，建议加上
+        }
         // 针对网络流优化
         media.addOption(":network-caching=3000")
-        mediaPlayer.media = media
-        media.release()
 
-        mediaPlayer.play()
+        mediaPlayer.media = media
+        setupEventListener()
+
     }
     // 在 MzVlcPlayer 类中添加成员
     private var _videoWidth = 1920
@@ -241,7 +274,11 @@ class MzVlcPlayer(
         AndroidView(
             factory = { ctx ->
                 VLCVideoLayout(ctx).apply {
-                    mediaPlayer.attachViews(this, null, false, false)
+                    mediaPlayer.attachViews(this, null, true, false)
+                    // 关键修改：在这里才真正开始播放，或者触发一个状态通知
+                    if (!mediaPlayer.isPlaying) {
+                        mediaPlayer.play()
+                    }
                 }
             },
             modifier = modifier.fillMaxSize(),

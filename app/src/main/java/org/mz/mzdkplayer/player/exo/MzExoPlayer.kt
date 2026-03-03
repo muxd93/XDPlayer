@@ -32,7 +32,7 @@ import org.mz.mzdkplayer.ui.screen.vm.VideoPlayerStatus
 
 @OptIn(UnstableApi::class)
 class MzExoPlayer(
-    private val context: Context,
+    context: Context,
     mediaUri: String,
     dataSourceType: String,
     settingsViewModel: SettingsViewModel

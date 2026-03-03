@@ -27,9 +27,18 @@
 * ✅ **WebDAV** (Supported; Note: LAN services like freenas/feiniu may only support HTTP, while public clouds like Aliyun support HTTPS).
 * ✅ **NFS** (Supported)
 * ✅ **HTTP** (Supported via NGINX servers)
-
-
 * 🎚️ **Track Switching** - Seamless switching between audio tracks, video tracks, and subtitle tracks.
+
+### 🔊 Advanced Playback: Audio Passthrough
+
+MzDKPlayer supports Audio Passthrough, allowing raw audio signals to be sent directly to your AV receiver, soundbar, or compatible TV for a cinema-grade experience.
+
+* **Settings Path**: `Settings` -> `Audio Settings` -> `Audio Passthrough`
+* **Compatibility**: **This setting applies ONLY to the VLC playback engine.** The ExoPlayer engine intelligently manages audio output based on device capabilities automatically, requiring no manual intervention.
+* **Recommendations**:
+* **Default Status**: Recommended to keep **OFF**. ExoPlayer provides automatic adaptation for most devices.
+* **Prerequisites**: Only enable this if you have an external receiver or high-end decoding hardware and are certain it supports the specific audio format (e.g., DTS-HD, TrueHD).
+* **Troubleshooting**: If you experience **no sound** after enabling this, your hardware may not support the specific audio format (e.g., some TVs do not support TrueHD passthrough). **Please turn off this setting** to allow the player to decode the audio into PCM.
 
 ### Format Support
 

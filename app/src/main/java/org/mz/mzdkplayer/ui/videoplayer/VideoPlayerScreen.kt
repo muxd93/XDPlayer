@@ -147,7 +147,7 @@ fun VideoPlayerScreen(
     // 1. 根据配置实例化解耦的 Player 内核
     val player: IMzPlayer = remember(useVlc, mediaUri) {
         if (useVlc) {
-            MzVlcPlayer(context, mediaUri)
+            MzVlcPlayer(context, mediaUri,settingsViewModel=settingsViewModel)
         } else {
             MzExoPlayer(context, mediaUri, dataSourceType, settingsViewModel)
         }
@@ -231,7 +231,7 @@ fun VideoPlayerScreen(
                     playbackPosition = currentPos,
                     mediaDuration = totalDur,
                     // 处理协议名称显示的逻辑
-                    protocolName = if (dataSourceType == "LOCAL") "本地文件" else dataSourceType,
+                    protocolName = if (dataSourceType == "LOCAL") "LOCAL" else dataSourceType,
                     connectionName = connectionName,
                     serverAddress = "test", // 如果你有真实的 server IP，请传入，否则留空或用占位符
                     mediaType = "VIDEO",    // 明确标记为视频

@@ -274,7 +274,7 @@ fun AudioSection(state: SettingsUiState, settingsVM: SettingsViewModel) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         SwitchSettingItem(
             title = "音频透传 (Passthrough)",
-            subtitle = "源码输出到功放 (HDMI/Optical)，需设备支持",
+            subtitle = "开启后，音频将源码直传至功放或解码设备。注意：此设置仅对 VLC 播放器生效（ExoPlayer 会自动智能匹配）。若播放时遇到静音，请尝试关闭此开关。",
             checked = state.enablePassthrough,
             onCheckedChange = { settingsVM.togglePassthrough(it) }
         )
