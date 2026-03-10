@@ -1,18 +1,5 @@
-# MzDKPlayer - 安卓TV本地弹幕音视频播放器 
-<p align="left">
-  <a href="https://github.com/mzhsy1/MzDKPlayer/releases">
-    <img src="https://img.shields.io/github/v/release/mzhsy1/MzDKPlayer?color=brightgreen&label=最新版本" alt="GitHub release">
-  </a>
-  <a href="https://github.com/mzhsy1/MzDKPlayer/releases">
-    <img src="https://img.shields.io/github/downloads/mzhsy1/MzDKPlayer/total?color=blue&label=总下载量" alt="GitHub downloads">
-  </a>
-  <a href="https://github.com/mzhsy1/MzDKPlayer/blob/main/LICENSE">
-    <img src="https://img.shields.io/github/license/mzhsy1/MzDKPlayer?color=orange" alt="License">
-  </a>
-  <a href="https://github.com/mzhsy1/MzDKPlayer/commits/main">
-    <img src="https://img.shields.io/github/last-commit/mzhsy1/MzDKPlayer?color=yellow" alt="Last commit">
-  </a>
-</p>
+# MzDKPlayer - 安卓TV本地弹幕音视频播放器
+![GitHub Downloads (all assets, all releases)](https://img.shields.io/github/downloads/mzhsy1/MzDKPlayer/total)
 [English](README_en.md) | 中文
 > GitHub https://github.com/mzhsy1/MzDKPlayer Gitee 镜像站点 https://gitee.com/mzhsy/MzDKPlayer
 
