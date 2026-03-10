@@ -128,6 +128,7 @@ fun MzDKPlayerAPP(externalVideoUri: Uri?) {
     LaunchedEffect(externalVideoUri) {
         if (externalVideoUri != null) {
             val uriString = externalVideoUri.toString()
+            Log.i("externalVideoUri",uriString)
             // 简单校验是否为有效视频链接（可选）
 //            if (uriString.startsWith("http") &&
 //                (uriString.endsWith(".mp4") ||

@@ -94,6 +94,7 @@ class MzVlcPlayer(
                 addOption(":audio-passthrough=1")
                 addOption(":spdif=hdmi")
                 addOption(":audio-passthrough=hdmi")
+                addOption(":http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
                 // 注意：如果电视不支持 TrueHD，VLC 只要看到这几个参数就会尝试透传
                 // 如果透传失败就会没声音。目前最稳妥是让用户在设置里切开关。
             } else {
