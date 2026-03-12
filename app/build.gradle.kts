@@ -15,8 +15,8 @@ android {
         applicationId = "org.mz.mzdkplayer"
         minSdk = 23
         targetSdk = 36
-        versionCode = 21
-        versionName = "1.15.2"
+        versionCode = 22
+        versionName = "1.15.3"
         ndk {
             //noinspection ChromeOsAbiSupport
             abiFilters += listOf("armeabi-v7a", "arm64-v8a","x86")
