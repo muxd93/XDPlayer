@@ -14,7 +14,7 @@ data class SettingsUiState(
     val hideNetworkSpeed: Boolean = true,
     val audioLang: String = "",
     val subLang: String = "",
-    val enableTunneling: Boolean = true,
+    val enableTunneling: Boolean = false,
     val enablePassthrough: Boolean = false,
     val subFontSize: Float = 22f,
     val subColor: Long = 0xFFFFFFFF,

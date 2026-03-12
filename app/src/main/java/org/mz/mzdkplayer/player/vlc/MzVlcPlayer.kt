@@ -39,16 +39,16 @@ class MzVlcPlayer(
         "--mediacodec-dr",
         "--vout=android_display", // 强制使用安卓原生显示输出，HDR 关键
         "--no-video-deco",        // 禁用装饰，防止 GLES 混合导致 HDR 失效
-        "--aout=android_audiotrack",
+        "--aout=audiotrack",
         "--file-caching=3000",
         "--network-caching=3000",
         "--clock-jitter=0",
         "--clock-synchro=0"
     ).apply {
         // 如果开启了直通，在全局参数里也加上支持
-        if (isPassthroughEnabled) {
-            add("--spdif")
-        }
+//        if (isPassthroughEnabled) {
+//            add("--spdif")
+//        }
         // VLC 的语言设置通常在初始化时通过参数传入
         preferredAudioLang?.let { add("--audio-language=$it") }
         preferredTextLang?.let { add("--sub-language=$it") }
@@ -81,26 +81,26 @@ class MzVlcPlayer(
     init {
 
         mediaPlayer.setAudioDigitalOutputEnabled(isPassthroughEnabled)
-        if (isPassthroughEnabled) {
-            mediaPlayer.setAudioOutput("android_audiotrack")
-        }
+//        if (isPassthroughEnabled) {
+        mediaPlayer.setAudioOutput("audiotrack")
+   //    }
         // 设置事件监听器同步状态
         val media = Media(libVLC, mediaUri.toUri()).apply {
             setHWDecoderEnabled(true, true)
             addOption(":codec=mediacodec_ndk")
 
-            // 3. 只有开启直通时，才注入这些 Media Option
-            if (isPassthroughEnabled) {
-                addOption(":audio-passthrough=1")
-                addOption(":spdif=hdmi")
-                addOption(":audio-passthrough=hdmi")
-                addOption(":http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
-                // 注意：如果电视不支持 TrueHD，VLC 只要看到这几个参数就会尝试透传
-                // 如果透传失败就会没声音。目前最稳妥是让用户在设置里切开关。
-            } else {
-                addOption(":audio-passthrough=0")
-            }
-
+//            // 3. 只有开启直通时，才注入这些 Media Option
+//            if (!isPassthroughEnabled) {
+////                addOption(":audio-passthrough=1")
+////                addOption(":spdif=hdmi")
+////                addOption(":audio-passthrough=hdmi")
+////                addOption(":http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+//                // 注意：如果电视不支持 TrueHD，VLC 只要看到这几个参数就会尝试透传
+//                // 如果透传失败就会没声音。目前最稳妥是让用户在设置里切开关。
+//            } else {
+//                addOption(":audio-passthrough=0")
+//            }
+            addOption(":http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
             addOption(":no-osd")
             addOption(":network-caching=3000")            // 实验代码里有的，建议加上
         }
