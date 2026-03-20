@@ -68,12 +68,12 @@ object SettingsRepository {
 
     // 视频 (ExoPlayer 建议)
     var enableTunneling: Boolean
-        get() = prefs.getBoolean(KEY_VIDEO_TUNNELING, true)
+        get() = prefs.getBoolean(KEY_VIDEO_TUNNELING, false)
         set(value) = prefs.edit { putBoolean(KEY_VIDEO_TUNNELING, value) }
 
     // 音频 (ExoPlayer 建议)
     var enablePassthrough: Boolean
-        get() = prefs.getBoolean(KEY_AUDIO_PASSTHROUGH, true)
+        get() = prefs.getBoolean(KEY_AUDIO_PASSTHROUGH, false)
         set(value) = prefs.edit { putBoolean(KEY_AUDIO_PASSTHROUGH, value) }
 
     // 字幕外观

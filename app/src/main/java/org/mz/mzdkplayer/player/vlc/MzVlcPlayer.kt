@@ -26,7 +26,7 @@ import org.videolan.libvlc.util.VLCVideoLayout
 
 class MzVlcPlayer(
     private val context: Context,
-    mediaUri: String,
+    private val mediaUri: String,
     dataSourceType: String,
     // 如果需要，可以把语言偏好也传进来
     private val preferredAudioLang: String? = null,
@@ -34,6 +34,14 @@ class MzVlcPlayer(
     settingsViewModel: SettingsViewModel
 ) : IMzPlayer {
     val isPassthroughEnabled = settingsViewModel.uiState.value.enablePassthrough // 获取当前的设置状态
+    private val isNetworkProtocol: Boolean by lazy {
+        val lower = mediaUri.lowercase()
+        lower.startsWith("http://") || lower.startsWith("https://") ||
+                lower.startsWith("ftp://") || lower.startsWith("smb://") ||
+                lower.startsWith("nfs://") || lower.startsWith("rtsp://") ||
+                lower.startsWith("rtmp://") ||
+                !lower.startsWith("file:///")   // 其他全部当网络处理
+    }
     // 1. 初始化 VLC 命令行参数
     private val options = arrayListOf(
         "-vvv",
@@ -42,8 +50,9 @@ class MzVlcPlayer(
         "--vout=android_display", // 强制使用安卓原生显示输出，HDR 关键
         "--no-video-deco",        // 禁用装饰，防止 GLES 混合导致 HDR 失效
         "--aout=audiotrack",
-        "--file-caching=3000",
-        "--network-caching=3000",
+        // 动态 caching（本地快，网络稳）
+        "--file-caching=${if (!isNetworkProtocol) 500 else 1200}",
+        "--network-caching=${if (isNetworkProtocol) 1500 else 800}",
         "--clock-jitter=0",
         "--clock-synchro=0"
     ).apply {
@@ -89,6 +98,7 @@ class MzVlcPlayer(
         // 设置事件监听器同步状态
         Log.d("VLCPlayer", "mediaStr → $mediaUri")
         Log.d("VLCPlayer", "mediaUri → ${mediaUri.toUri()}")
+
         val vlcSafeUri = Tools.encodeUrlForPlayer(mediaUri)
         val media = Media(libVLC, vlcSafeUri.toUri()).apply {
             setHWDecoderEnabled(true, true)
@@ -107,14 +117,16 @@ class MzVlcPlayer(
 //            }
             addOption(":http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
             addOption(":no-osd")
-            addOption(":network-caching=3000")            // 实验代码里有的，建议加上
+            addOption(":network-caching=${if (isNetworkProtocol) 1500 else 800}")
+            addOption(":file-caching=${if (!isNetworkProtocol) 500 else 1200}")          // 实验代码里有的，建议加上
         }
         // 针对网络流优化
-        media.addOption(":network-caching=3000")
+
 
         mediaPlayer.media = media
         // 3. ⭐️ 关键：在这里立即释放局部引用
         media.release()
+        setupMediaParseListener()
         setupEventListener()
 
     }
@@ -163,7 +175,28 @@ class MzVlcPlayer(
             }
         }
     }
+    private fun setupMediaParseListener() {
+        val media = mediaPlayer.media ?: return
 
+        media.setEventListener { event ->
+            if (event.type == IMedia.Event.ParsedChanged &&
+                event.parsedStatus == IMedia.ParsedStatus.Done) {
+                Log.d("MzVlcPlayer", " Media 解析完成！协议: ${if(isNetworkProtocol) "网络(SMB/NFS/FTP)" else "本地 file:///"}")
+                updateTracks()
+            }
+        }
+
+        // 立即启动解析（关键修复）
+        if (!media.isParsed) {
+            val parseFlag = if (isNetworkProtocol)
+                IMedia.Parse.ParseNetwork      // SMB/NFS/FTP/HTTP 必须用这个
+            else
+                IMedia.Parse.ParseLocal        // file:/// 用这个更快
+
+            media.parseAsync(parseFlag)
+            Log.d("MzVlcPlayer", " 启动解析模式: ${if(isNetworkProtocol) "ParseNetwork" else "ParseLocal"}")
+        }
+    }
     private fun updateTracks() {
         // 处理视频轨道 (VLC 视频轨道通常只读)
         //val videoTrackDescriptions = mediaPlayer.videoTracks ?: emptyArray()
