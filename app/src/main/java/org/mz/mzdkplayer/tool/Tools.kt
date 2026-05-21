@@ -768,22 +768,32 @@ object Tools {
 
                 val hostPathParts = hostAndPath.split("/", limit = 2)
                 val host = hostPathParts[0]
-                val pathPart = if (hostPathParts.size > 1) hostPathParts[1] else ""
 
-                // 核心修复：对路径部分进行标准编码，确保空格变成 %20，中文字符被正确转码
-                val encodedPath = pathPart.split("/").joinToString("/") { segment ->
-                    URLEncoder.encode(segment, "UTF-8").replace("+", "%20")
+                if (hostPathParts.size > 1) {
+                    val fullPath = hostPathParts[1]
+
+                    // 核心修复：分离路径(Path)和查询参数(Query)
+                    val queryIndex = fullPath.indexOf("?")
+                    val pathPart = if (queryIndex != -1) fullPath.substring(0, queryIndex) else fullPath
+                    val queryPart = if (queryIndex != -1) fullPath.substring(queryIndex) else "" // 保留包含 '?' 在内的所有参数
+
+                    // 只对纯路径部分进行编码，避免误伤 ? = & 等符号
+                    val encodedPath = pathPart.split("/").joinToString("/") { segment ->
+                        URLEncoder.encode(segment, "UTF-8").replace("+", "%20")
+                    }
+
+                    "$protocol$protocolSeparator$host/$encodedPath$queryPart"
+                } else {
+                    path
                 }
-
-                "$protocol$protocolSeparator$host/$encodedPath"
             } else {
-                // 如果没有协议前缀的处理
+                // 如果没有协议前缀，当做普通文件路径处理
                 path.split("/").joinToString("/") { segment ->
                     URLEncoder.encode(segment, "UTF-8").replace("+", "%20")
                 }
             }
         } catch (e: Exception) {
-            path // 降级处理
+            path // 降级处理，报错就原样返回
         }
     }
 
@@ -801,7 +811,7 @@ object Tools {
 
         return if (hours > 0) {
             // 超过1小时，显示 HH:mm:ss
-            String.format("%02d:%02d:%02d", hours, minutes, seconds)
+            String.format(Locale.getDefault(),"%02d:%02d:%02d", hours, minutes, seconds)
         } else {
             // 不足1小时，显示 mm:ss
             String.format("%02d:%02d", minutes, seconds)
@@ -821,6 +831,22 @@ object Tools {
             hours > 0 -> "${hours}h ${minutes}m"
             else -> formatTime(ms) // 调用上面的基础版显示 mm:ss
         }
+    }
+    /**
+     * 将 Assets 里的字体拷贝到私有目录，并返回绝对路径
+     */
+    fun prepareFont(context: Context, fontName: String): String {
+        val fontFile = File(context.filesDir, fontName)
+
+        // 如果文件不存在才拷贝，避免每次启动都耗时
+        if (!fontFile.exists()) {
+            context.assets.open("fonts/$fontName").use { input ->
+                fontFile.outputStream().use { output ->
+                    input.copyTo(output)
+                }
+            }
+        }
+        return fontFile.absolutePath
     }
 }
 

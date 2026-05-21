@@ -15,8 +15,8 @@ android {
         applicationId = "org.mz.mzdkplayer"
         minSdk = 23
         targetSdk = 36
-        versionCode = 23
-        versionName = "1.15.4"
+        versionCode = 95
+        versionName = "1.15.6"
         ndk {
             //noinspection ChromeOsAbiSupport
             abiFilters += listOf("armeabi-v7a", "arm64-v8a","x86")
@@ -108,7 +108,7 @@ dependencies {
 //    implementation(libs.androidx.media3.exoplayer.dash)
     //implementation(libs.androidx.media3.ui)
     implementation(libs.androidx.media3.ui.compose)
-    implementation(libs.vlc.android.mini)
+    //implementation(libs.vlc.android.mini)
     implementation(files("libs/lib-decoder-ffmpeg-release.aar"))
    // implementation(files("libs/libvlc-release.aar"))
     // 弹幕相关
@@ -160,7 +160,7 @@ dependencies {
     //implementation("androidx.media3:media3-exoplayer-ffmpeg:1.9.0-alpha01")
     //implementation(libs.jcifs)
 //    // https://mvnrepository.com/artifact/org.videolan.android/libvlc-all
-//    implementation(libs.libvlc.all)
+    implementation(libs.libvlc.all)
 // 请检查最新版本
     //implementation(libs.ass.kt)
     //implementation(libs.ass.media.v030beta02)

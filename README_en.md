@@ -1,4 +1,5 @@
 # MzDKPlayer - Android TV Local Danmaku Media Player
+![GitHub Downloads (all assets, all releases)](https://img.shields.io/github/downloads/mzhsy1/MzDKPlayer/total)
 
 中文 | [English](https://www.google.com/search?q=README_en.md)
 

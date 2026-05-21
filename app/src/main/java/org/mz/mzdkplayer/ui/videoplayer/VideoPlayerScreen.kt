@@ -812,7 +812,7 @@ fun VideoPlayerScreen(
                 )
                 else -> {
                     SubtitleTrackPanel(
-                        lists = subtitleTracks, onTrackSelected = { track ->
+                        subtitleTracks = player.subtitleTracks, onTrackSelected = { track ->
                             player.selectSubtitleTrack(track)
                         },onLoadExternalSubtitle = {
                             // 1. 拿到当前正在播的视频 URI
@@ -824,9 +824,13 @@ fun VideoPlayerScreen(
                                 val basePath = videoUri.substring(0, lastDotIndex)
                                 val extensions = listOf("ass", "srt", "ssa", "vtt")
 
-                                // 构造字幕列表：Pair(URI路径, 显示名称)
+                                // 构造字幕列表：Pair(安全的URI路径, 显示名称)
                                 val subList = extensions.map { ext ->
-                                    "$basePath.$ext" to "[外部加载]$ext"
+                                    val rawSubtitleUrl = "$basePath.$ext"
+                                    // 【核心修复】：必须对拼装好的字幕 URL 进行编码转换，替换空格并转码中文
+                                    val safeSubtitleUrl = Tools.encodeUrlForPlayer(rawSubtitleUrl)
+
+                                    safeSubtitleUrl to "[外部加载]$ext"
                                 }
 
                                 // 3. 调用播放器接口批量添加

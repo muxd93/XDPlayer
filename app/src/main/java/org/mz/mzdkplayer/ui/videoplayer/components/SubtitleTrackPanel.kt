@@ -11,6 +11,8 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -27,6 +29,7 @@ import androidx.tv.material3.Icon
 import androidx.tv.material3.ListItem
 import androidx.tv.material3.ListItemDefaults
 import androidx.tv.material3.Text
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import org.mz.mzdkplayer.R
 import org.mz.mzdkplayer.player.core.MzBasicTrack
@@ -37,7 +40,7 @@ import org.mz.mzdkplayer.ui.theme.myListItemCoverColor
 
 @Composable
 fun SubtitleTrackPanel(
-    lists: List<MzBasicTrack>,
+    subtitleTracks: StateFlow<List<MzBasicTrack>>,   // 改成 StateFlow
     onTrackSelected: (MzBasicTrack) -> Unit,
     onLoadExternalSubtitle: () -> Unit // 新增：将加载外部字幕的逻辑交给调用者（PlayerScreen）去处理
 ) {
@@ -45,7 +48,7 @@ fun SubtitleTrackPanel(
     val isVis = remember { mutableStateOf(false) }
     val coroutineScope = rememberCoroutineScope()
     val listState = rememberLazyListState()
-
+    val lists by subtitleTracks.collectAsState()   // ← 关键
     // 找出当前选中的 index
     val selectedIndex = lists.indexOfFirst { it.isSelected }.takeIf { it >= 0 } ?: 0
 
@@ -105,6 +108,7 @@ fun SubtitleTrackPanel(
                         else -> "$languageText ${stringResource(R.string.ui_label_language_subtitles)}"
                     }
                     println("TrackDebug: name='$trackLabel', isExternal=$isExternalAutoSearch")
+
                     ListItem(
                         modifier = Modifier
                             .padding(start = 15.dp, end = 15.dp, top = 10.dp, bottom = 10.dp)
@@ -123,12 +127,20 @@ fun SubtitleTrackPanel(
                             focusedContentColor = Color(0, 0, 0)
                         ),
                         headlineContent = {
-                            Text(
-                                text = titleText,
-                            )
+                            if (track.id!="-1") {
+                                Text(
+                                    text = titleText,
+                                )
+                            }else{
+                                Text(
+                                    text = "关闭字幕",
+                                )
+                            }
                         },
                         overlineContent = {
+                            if (track.id!="-1") {
                             Text(stringResource(R.string.ui_label_subtitle_format,trackMimeType))
+                                }
                         },
                         leadingContent = if (selectedIndex == index) {
                             { Icon(Icons.Filled.Check, contentDescription = "已选择") }
