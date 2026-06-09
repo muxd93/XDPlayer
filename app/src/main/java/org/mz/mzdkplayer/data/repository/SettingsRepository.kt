@@ -47,6 +47,9 @@ object SettingsRepository {
     private const val KEY_SOURCE_LOCAL = "source_local"
     private const val KEY_SOURCE_HTTP = "source_http"
     private const val KEY_APP_LANGUAGE = "app_language"
+
+    // 🔥 新增：Exo音频解码模式 (0=纯硬解, 1=硬解优先, 2=软解优先)
+    private const val KEY_EXO_AUDIO_DECODE_MODE = "exo_audio_decode_mode"
     // --- Getters & Setters ---
 
     // 常规
@@ -75,7 +78,9 @@ object SettingsRepository {
     var enablePassthrough: Boolean
         get() = prefs.getBoolean(KEY_AUDIO_PASSTHROUGH, false)
         set(value) = prefs.edit { putBoolean(KEY_AUDIO_PASSTHROUGH, value) }
-
+    var exoAudioDecodeMode: Int
+        get() = prefs.getInt(KEY_EXO_AUDIO_DECODE_MODE, 1) // 默认 1 (硬解优先)
+        set(value) = prefs.edit { putInt(KEY_EXO_AUDIO_DECODE_MODE, value) }
     // 字幕外观
     var subtitleFontSize: Float
         get() = prefs.getFloat(KEY_SUB_SIZE, 22f)

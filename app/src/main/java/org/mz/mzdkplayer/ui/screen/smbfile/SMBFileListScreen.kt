@@ -88,6 +88,7 @@ import org.mz.mzdkplayer.ui.screen.vm.MovieViewModel
 import org.mz.mzdkplayer.ui.screen.vm.SettingsViewModel
 import java.net.URLDecoder
 import java.net.URLEncoder
+import kotlin.time.Duration.Companion.milliseconds
 
 @OptIn(UnstableApi::class)
 @Composable
@@ -167,7 +168,7 @@ fun SMBFileListScreen(
         when (connectionStatus) {
             is FileConnectionStatus.Disconnected -> {
                 Log.d("SMBFileListScreen", "未连接，开始连接: ${smbConfig.server}")
-                delay(300)
+                delay(300.milliseconds)
                 viewModel.connectToSMB(
                     smbConfig.server,
                     smbConfig.username,
@@ -249,7 +250,7 @@ fun SMBFileListScreen(
                 // 显示错误信息
                 val errorMessage = (connectionStatus as FileConnectionStatus.Error).message
                 VAErrorScreen(
-                    "${stringResource(R.string.ui_label_loading_failed,errorMessage)}",
+                    stringResource(R.string.ui_label_loading_failed,errorMessage),
                 )
             }
             is FileConnectionStatus.FilesLoaded -> {
@@ -703,61 +704,61 @@ fun SMBFileListScreen(
             }
         }
     }
-    if (showEditDialog) {
-        MyFileDialog(
-            onDismiss = { showEditDialog = false },
-            fileName = focusedFileName,
-            onEditClick = {
-                showEditDialog = false
-                navController.navigate(
-                    "EditTMDBInfoScreen/${
-                        URLEncoder.encode(
-                            focusedMediaUri,
-                            "UTF-8"
-                        )
-                    }"
-                )
-            },
-            onCloseClick = { showEditDialog = false }
-        )
-    }
-    if (showISODialog) {
-        ISODialog(
-            onDismiss = {
-                showISODialog = false
-                isoTitles = emptyList() // 清理数据
-            },
-            fileName = currentISOFileName,
-            titles = isoTitles,
-            currentUri = currentISOUri,
-            onTitleSelected = { selectedTitle ->
-                showISODialog = false
-                isoTitles = emptyList()
-
-                // TODO: 如果你想支持指定 Title 播放，可以在这里把 title 索引传给 VideoPlayer
-                // 例如修改导航为 "VideoPlayer/$encodedUri/SMB/$encodedFileName/${connectionName}?title=0"
-                // 然后在 MzVlcPlayer.kt 的 options 或 media.addOption(":dvd-title=${index}") 里使用
-                val encodedUri = try {
-                    URLEncoder.encode(currentISOUri, "UTF-8")
-                } catch (e: Exception) {
-                    Log.e("SMBFileListScreen", "ISO URI 编码失败: $e")
-                    return@ISODialog
-                }
-                val encodedFileName = try {
-                    URLEncoder.encode(currentISOFileName ?: "", "UTF-8")
-                } catch (e: Exception) {
-                    Log.e("SMBFileListScreen", "ISO 文件名编码失败: $e")
-                    return@ISODialog
-                }
-
-                navController.navigate("VideoPlayer/$encodedUri/SMB/$encodedFileName/${connectionName}")
-            },
-            onCloseClick = {
-                showISODialog = false
-                isoTitles = emptyList()
-            }
-        )
-    }
+//    if (showEditDialog) {
+//        MyFileDialog(
+//            onDismiss = { showEditDialog = false },
+//            fileName = focusedFileName,
+//            onEditClick = {
+//                showEditDialog = false
+//                navController.navigate(
+//                    "EditTMDBInfoScreen/${
+//                        URLEncoder.encode(
+//                            focusedMediaUri,
+//                            "UTF-8"
+//                        )
+//                    }"
+//                )
+//            },
+//            onCloseClick = { showEditDialog = false }
+//        )
+//    }
+//    if (showISODialog) {
+//        ISODialog(
+//            onDismiss = {
+//                showISODialog = false
+//                isoTitles = emptyList() // 清理数据
+//            },
+//            fileName = currentISOFileName,
+//            titles = isoTitles,
+//            currentUri = currentISOUri,
+//            onTitleSelected = { selectedTitle ->
+//                showISODialog = false
+//                isoTitles = emptyList()
+//
+//                // TODO: 如果你想支持指定 Title 播放，可以在这里把 title 索引传给 VideoPlayer
+//                // 例如修改导航为 "VideoPlayer/$encodedUri/SMB/$encodedFileName/${connectionName}?title=0"
+//                // 然后在 MzVlcPlayer.kt 的 options 或 media.addOption(":dvd-title=${index}") 里使用
+//                val encodedUri = try {
+//                    URLEncoder.encode(currentISOUri, "UTF-8")
+//                } catch (e: Exception) {
+//                    Log.e("SMBFileListScreen", "ISO URI 编码失败: $e")
+//                    return@ISODialog
+//                }
+//                val encodedFileName = try {
+//                    URLEncoder.encode(currentISOFileName ?: "", "UTF-8")
+//                } catch (e: Exception) {
+//                    Log.e("SMBFileListScreen", "ISO 文件名编码失败: $e")
+//                    return@ISODialog
+//                }
+//
+//                navController.navigate("VideoPlayer/$encodedUri/SMB/$encodedFileName/${connectionName}")
+//            },
+//            onCloseClick = {
+//                showISODialog = false
+//                isoTitles = emptyList()
+//            }
+//        )
+//    }
 }
 
 

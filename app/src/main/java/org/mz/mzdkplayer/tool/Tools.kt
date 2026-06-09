@@ -41,7 +41,7 @@ import java.net.URLEncoder
 
 object Tools {
     fun extractFileExtension(fileName: String?): String {
-        if (fileName == null || fileName.isEmpty()) {
+        if (fileName.isNullOrEmpty()) {
             return ""
         }
         // 处理可能以点结尾的文件名或隐藏文件（无扩展名）
@@ -172,7 +172,6 @@ object Tools {
     }
     /**
      * 根据音频轨道的 Format 信息推断具体的音频格式类型
-     * @param format 音频轨道的 Format 对象
      * @return 推断出的音频格式描述字符串
      */
     fun inferAudioFormatType(mimeType: String): String {
@@ -814,7 +813,7 @@ object Tools {
             String.format(Locale.getDefault(),"%02d:%02d:%02d", hours, minutes, seconds)
         } else {
             // 不足1小时，显示 mm:ss
-            String.format("%02d:%02d", minutes, seconds)
+            String.format(Locale.getDefault(),"%02d:%02d", minutes, seconds)
         }
     }
     /**

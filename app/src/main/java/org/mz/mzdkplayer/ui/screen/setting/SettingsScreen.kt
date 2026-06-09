@@ -302,6 +302,21 @@ fun AudioSection(state: SettingsUiState, settingsVM: SettingsViewModel) {
             checked = state.enablePassthrough,
             onCheckedChange = { settingsVM.togglePassthrough(it) }
         )
+        // 新增音频解码模式切换选项
+        ActionSettingItem(
+            title = "ExoPlayer音频解码模式(仅对ExoPlayer播放内核生效)",
+            value = formatAudioDecodeMode(state.exoAudioDecodeMode),
+            onClick = {
+                // 循环切换逻辑: 1(硬优先) -> 2(软优先) -> 0(纯硬解) -> 1(硬优先)
+                val next = when (state.exoAudioDecodeMode) {
+                    1 -> 2
+                    2 -> 0
+                    else -> 1
+                }
+                settingsVM.setExoAudioDecodeMode(next)
+            }
+        )
+
     }
 }
 
@@ -624,4 +639,11 @@ fun formatAppLang(code: String): String = when(code){
     "en" -> "English"
     "ja" -> "日本語"
     else -> stringResource(R.string.lang_auto)
+}
+@Composable
+fun formatAudioDecodeMode(mode: Int): String = when (mode) {
+    0 -> "纯硬解 (不支持FFmpeg)"
+    1 -> "硬解优先 (支持音频直通)"
+    2 -> "软解优先 (兼容性最好)"
+    else -> "未知"
 }

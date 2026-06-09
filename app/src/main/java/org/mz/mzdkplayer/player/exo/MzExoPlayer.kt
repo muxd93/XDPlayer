@@ -61,11 +61,13 @@ class MzExoPlayer(
 
     private var isFirstTrackAutoSelected = false
 
+    val settingsState = settingsViewModel.uiState.value // 获取当前的设置状态
+
     // 这里放入你原本 rememberPlayer 中的 ExoPlayer 初始化逻辑
     // 1. 配置 RenderersFactory
     val renderersFactory: DefaultRenderersFactory = DefaultRenderersFactory(context)
         .forceEnableMediaCodecAsynchronousQueueing()
-        .setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON)
+        .setExtensionRendererMode(settingsState.exoAudioDecodeMode)
 
     // 3. 配置 TrackSelector (隧道模式)
     val trackSelector = DefaultTrackSelector(context)
@@ -86,7 +88,7 @@ class MzExoPlayer(
             playWhenReady = true
             repeatMode = Player.REPEAT_MODE_ONE
         }
-    val settingsState = settingsViewModel.uiState.value // 获取当前的设置状态
+
 
     init {
 

@@ -16,6 +16,7 @@ data class SettingsUiState(
     val subLang: String = "",
     val enableTunneling: Boolean = false,
     val enablePassthrough: Boolean = false,
+    val exoAudioDecodeMode: Int = 1, // 新增：音频解码模式
     val subFontSize: Float = 22f,
     val subColor: Long = 0xFFFFFFFF,
     val subBgColor: Long = 0x80000000,
@@ -50,6 +51,7 @@ class SettingsViewModel : ViewModel() {
                 subLang = repo.subtitleLanguage,
                 enableTunneling = repo.enableTunneling,
                 enablePassthrough = repo.enablePassthrough,
+                exoAudioDecodeMode = repo.exoAudioDecodeMode, // 新增这一行
                 subFontSize = repo.subtitleFontSize,
                 subColor = repo.subtitleColorHex,
                 subBgColor = repo.subtitleBgColorHex,
@@ -99,6 +101,10 @@ class SettingsViewModel : ViewModel() {
             "Local" -> repo.enableLocal = v
             "HTTP" -> repo.enableHttp = v
         }
+        refreshState()
+    }
+    fun setExoAudioDecodeMode(mode: Int) {
+        repo.exoAudioDecodeMode = mode
         refreshState()
     }
 }

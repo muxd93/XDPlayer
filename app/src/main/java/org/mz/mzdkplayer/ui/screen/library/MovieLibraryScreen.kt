@@ -6,22 +6,25 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyHorizontalGrid
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.magnifier
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -39,6 +42,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLocale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -48,6 +52,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import androidx.paging.LoadState
 import androidx.paging.compose.collectAsLazyPagingItems
+import androidx.tv.material3.Border
+import androidx.tv.material3.ClickableSurfaceDefaults
 import androidx.tv.material3.ExperimentalTvMaterial3Api
 import androidx.tv.material3.ListItem
 import androidx.tv.material3.MaterialTheme
@@ -58,20 +64,15 @@ import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import coil3.request.crossfade
 import org.mz.mzdkplayer.R
-
 import org.mz.mzdkplayer.data.local.MediaCacheEntity
 import org.mz.mzdkplayer.ui.screen.common.LibraryEmpty
 import org.mz.mzdkplayer.ui.screen.common.LoadingScreen
-import org.mz.mzdkplayer.ui.screen.common.MediaCard
 import org.mz.mzdkplayer.ui.screen.common.MyFileDialog
 import org.mz.mzdkplayer.ui.screen.vm.MediaLibraryViewModel
 import org.mz.mzdkplayer.ui.screen.vm.SettingsViewModel
 import org.mz.mzdkplayer.ui.theme.myListItemCoverColor
 import java.net.URLEncoder
-import java.util.Locale
-import androidx.compose.ui.platform.LocalLocale
 
-// === 电影屏幕 (原生 Box 实现沉浸式列表 - 修复卡片遮挡) ===
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
 fun MovieLibraryScreen(
@@ -83,49 +84,35 @@ fun MovieLibraryScreen(
     val movies = viewModel.pagedMovies.collectAsLazyPagingItems()
     val movieVersions by viewModel.selectedMovieVersions.collectAsState()
 
-    // 状态：当前获得焦点的电影 (用于更新背景)
     var focusedMovie by remember { mutableStateOf<MediaCacheEntity?>(null) }
-
     var showVersionDialog by remember { mutableStateOf(false) }
     var selectedMovieTitle by remember { mutableStateOf("") }
-    // 状态：标记是否需要检查版本数量并执行跳转/弹窗逻辑
     var checkVersionsAfterLoad by remember { mutableStateOf(false) }
     val settingsState by settingsViewModel.uiState.collectAsState()
     val isMoviesLoading = movies.loadState.refresh == LoadState.Loading
     val isMoviesEmpty = movies.itemCount == 0
-    // 控制弹窗显示
     var showEditDialog by remember { mutableStateOf(false) }
-// 👇 1. 为电影列表创建一个专属的 FocusRequester
+
     val listFocusRequester = remember { FocusRequester() }
-    // 开头获取 context
     val context = LocalContext.current
-    // 在开头定义一个临时状态
     var isLongClickAction by remember { mutableStateOf(false) }
-    // 修改后的 LaunchedEffect
+
     LaunchedEffect(movieVersions.size, checkVersionsAfterLoad) {
         if (checkVersionsAfterLoad && movieVersions.isNotEmpty()) {
             val versionCount = movieVersions.size
-
             if (isLongClickAction) {
-                // === 修改后的长按逻辑 ===
                 if (versionCount == 1) {
-                    // 只有一个版本，允许修改
                     showEditDialog = true
                 } else {
-                    // 【核心修改】多个版本时，不弹窗，直接提示用户
                     Toast.makeText(
                         context,
                         context.getString(R.string.ui_label_multiple_versions_detected),
                         Toast.LENGTH_SHORT
                     ).show()
-
-                    // 可选：如果你还是想让用户选版本，但不直接进修改逻辑，可以注释掉下面这行
-                    // showVersionDialog = true
                 }
                 isLongClickAction = false
                 checkVersionsAfterLoad = false
             } else {
-                // === 处理点击播放逻辑 ===
                 when (versionCount) {
                     1 -> {
                         val version = movieVersions.first()
@@ -134,8 +121,7 @@ fun MovieLibraryScreen(
                         val connectionName = URLEncoder.encode(version.connectionName, "UTF-8")
                         if (!settingsState.hideDetails) {
                             navController.navigate("MovieDetails/$encodedUri/${version.dataSourceType}/$encodedFileName/$connectionName/${version.tmdbId}")
-                        }
-                        else{
+                        } else {
                             navController.navigate("VideoPlayer/$encodedUri/${version.dataSourceType}/$encodedFileName/$connectionName")
                         }
                         checkVersionsAfterLoad = false
@@ -149,32 +135,32 @@ fun MovieLibraryScreen(
             }
         }
     }
-    // 👇 2. 监听状态变化，当列表不是加载中且不为空时，自动请求焦点
+
     LaunchedEffect(isMoviesLoading, isMoviesEmpty) {
         if (!isMoviesLoading && !isMoviesEmpty) {
-            // 使用 runCatching 防止在节点完全挂载前请求焦点抛出异常
             runCatching { listFocusRequester.requestFocus() }
         }
     }
-    // 如果刚进入页面没有焦点，默认尝试获取列表第一个作为背景
+
     LaunchedEffect(movies.itemSnapshotList.items) {
         if (focusedMovie == null && movies.itemCount > 0) {
             focusedMovie = movies.itemSnapshotList.items.firstOrNull()
         }
     }
-    if (isMoviesLoading){
+
+    if (isMoviesLoading) {
         LoadingScreen(modifier = Modifier.fillMaxSize())
-    }else if (isMoviesEmpty){
+    } else if (isMoviesEmpty) {
         LibraryEmpty(navController = homeNavController)
-    }else{
-        // === 使用 Box 容器来实现 ImmersiveList 的效果 ===
-        Box(modifier = Modifier.fillMaxSize())
-        {
-            // 1. 背景层 (Background) - 位于最底层
+    } else {
+        // 使用符合现代电视 UI 的暗色底色
+        Box(modifier = Modifier.fillMaxSize().background(Color(0xFF0F1115))) {
+
+            // ================= 1. 沉浸式海报背景层 =================
             AnimatedContent(
                 targetState = focusedMovie,
                 transitionSpec = {
-                    fadeIn(animationSpec = tween(500)) togetherWith fadeOut(animationSpec = tween(500))
+                    fadeIn(animationSpec = tween(600)) togetherWith fadeOut(animationSpec = tween(600))
                 },
                 label = "BackgroundAnimation",
                 modifier = Modifier.fillMaxSize()
@@ -185,27 +171,26 @@ fun MovieLibraryScreen(
                         if (backdropUrl != null) {
                             AsyncImage(
                                 model = ImageRequest.Builder(LocalContext.current)
-                                    // 加上 TMDB 基础路径和尺寸
                                     .data("https://image.tmdb.org/t/p/w1280$backdropUrl")
                                     .crossfade(true)
                                     .build(),
                                 contentDescription = null,
                                 contentScale = ContentScale.Crop,
                                 modifier = Modifier.fillMaxSize(),
-                                alpha = 0.6f // 稍微调暗一点，让文字更清晰
+                                alpha = 0.75f
                             )
                         }
 
-                        // 渐变遮罩 (让底部和左侧文字区域更清晰)
+                        // 多层渐变面罩，确保背景不管多亮，文字都绝对清晰
                         Box(
                             modifier = Modifier
                                 .fillMaxSize()
                                 .background(
                                     Brush.verticalGradient(
                                         colors = listOf(
-                                            Color.Black.copy(alpha = 0.3f),
-                                            Color.Black.copy(alpha = 0.8f),
-                                            Color.Black.copy(alpha = 0.95f) // 底部接近纯黑
+                                            Color.Black.copy(alpha = 0.1f),
+                                            Color.Black.copy(alpha = 0.5f),
+                                            Color.Black.copy(alpha = 0.95f)
                                         )
                                     )
                                 )
@@ -216,168 +201,196 @@ fun MovieLibraryScreen(
                                 .background(
                                     Brush.horizontalGradient(
                                         colors = listOf(
-                                            Color.Black.copy(alpha = 0.9f),
+                                            Color.Black.copy(alpha = 0.85f),
+                                            Color.Black.copy(alpha = 0.3f),
                                             Color.Transparent
                                         ),
-                                        endX = 1000f // 左侧文字区域加深
+                                        endX = 1100f
                                     )
                                 )
-                        )
-                    } else {
-                        // 空状态背景
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .background(Color(0xFF111111))
                         )
                     }
                 }
             }
 
-            // 2. 列表层 (List) 和预留空间
+            // ================= 2. 核心内容排版层（规范对齐） =================
             Column(modifier = Modifier.fillMaxSize()) {
 
-                // 【修改点 2.1】增加顶部预留空间的高度，确保第一行卡片不会和顶部信息重叠
-                Spacer(modifier = Modifier.height(260.dp)) // 预留出信息展示区域的高度
-
-                // 电影列表
-                LazyHorizontalGrid (
-                    rows = GridCells.Fixed(1),
-                    // 【修改点 2.2】设置底部内边距，确保列表底部有足够的空间，防止卡片贴边
-                    // 设置左右内边距，并为卡片聚焦效果预留额外的顶部和底部空间
-                    contentPadding = PaddingValues(
-                        start = 32.dp,
-                        end = 32.dp,
-                        top = 10.dp, // 预留焦点放大空间
-                        bottom = 10.dp // 底部预留，避免卡片贴边和遮挡提示文字
-                    ),
-                    horizontalArrangement = Arrangement.spacedBy(24.dp), // <--- 增大水平间距，让卡片更分散
+                // 顶部信息展示区
+                Box(
                     modifier = Modifier
-                        .height(260.dp).background(Color.Transparent).focusRequester(listFocusRequester)// 占据 Column 剩下的所有垂直空间，实现滚动
+                        .fillMaxWidth()
+                        .weight(1f) // 让它自动占据列表上方的所有剩余空间
+                ) {
+                    AnimatedContent(
+                        targetState = focusedMovie,
+                        transitionSpec = {
+                            fadeIn(animationSpec = tween(400)) togetherWith fadeOut(animationSpec = tween(400))
+                        },
+                        label = "MovieInfoAnimation",
+                        modifier = Modifier
+                            .align(Alignment.TopStart)
+                            // 🚀 关键调整在这里：
+                            // start = 260.dp (避开左侧导航栏，并向右缩进)
+                            // top = 160.dp (把文字整体往下推，让出顶部背景空间)
+                            .padding(start = 50.dp, top = 160.dp)
+                            .widthIn(max = 700.dp) // 限制最大宽度，防止文字拉得太长
+                    ) { movie ->
+                        if (movie != null) {
+                            Column {
+                                // ① 元数据行 (分级 • 类型 • 年份)
+                                val year = movie.releaseDate?.take(4) ?: ""
+                                val typeString = if (movie.mediaType == "tv") "TV Series" else "Movie"
+                                val ratingString = String.format(LocalLocale.current.platformLocale, "%.1f ★", movie.voteAverage)
+
+                                // 🚀 修正这里：先用 map 拿到 name，再用 joinToString 拼接
+                                val genresString =
+                                    movie.genres.take(2).joinToString("/") { it.name }
+
+                                // 按照截图样式：Movie · Animation/Family · 2001 · 8.5 ★
+                                val metadataText = listOfNotNull(
+                                    typeString,
+                                    genresString.ifEmpty { "" },
+                                    year.ifEmpty { null },
+                                    ratingString
+                                ).joinToString(" · ")
+
+                                Text(
+                                    text = metadataText,
+                                    style = MaterialTheme.typography.labelLarge,
+                                    color = Color.White.copy(alpha = 0.55f),
+                                    fontWeight = FontWeight.Medium
+                                )
+
+                                Spacer(modifier = Modifier.height(10.dp))
+
+                                // ② 大标题 (千与千寻)
+                                Text(
+                                    text = movie.title,
+                                    style = MaterialTheme.typography.displaySmall, // 稍微加大了一点字号适配新图
+                                    color = Color.White,
+                                    fontWeight = FontWeight.Bold,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+
+                                Spacer(modifier = Modifier.height(14.dp))
+
+                                // ③ 简介
+                                Text(
+                                    text = movie.overview.ifEmpty { "No description available." },
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = Color.White.copy(alpha = 0.75f),
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis,
+                                    lineHeight = MaterialTheme.typography.bodyLarge.lineHeight * 1.3f
+                                )
+                            }
+                        }
+                    }
+                }
+                // ================= 3. 横向列表层（原生 Surface 替换 MediaCard） =================
+                LazyHorizontalGrid(
+                    rows = GridCells.Fixed(1),
+                    contentPadding = PaddingValues(
+                        start = 58.dp,  // 🚀 像素级还原蓝图：列表左安全边距 58.dp
+                        end = 58.dp,
+                        top = 12.dp,    // 预留焦点放大扩展空间
+                        bottom = 24.dp
+                    ),
+                    horizontalArrangement = Arrangement.spacedBy(18.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(145.dp) // 16:9 卡片高 100dp + 放大高度和内边距的空间
+                        .focusRequester(listFocusRequester)
                 ) {
                     items(movies.itemCount) { index ->
                         val movie = movies[index]
                         if (movie != null) {
-                            MediaCard(
-                                title = movie.title,
-                                posterPath = movie.posterPath,
-                                year = movie.releaseDate?.take(4) ?: "",
-                                modifier = Modifier
-                                    .onFocusChanged { focusState ->
-                                        if (focusState.isFocused) {
-                                            focusedMovie = movie
-                                        }
-                                    },
+
+                            // 使用原生 TV Clickable Surface 替换
+                            Surface(
+                                // 直接在这里使用官方提供的 onClick
                                 onClick = {
                                     selectedMovieTitle = movie.title
                                     viewModel.clearSelectedMovieVersions()
                                     viewModel.loadMovieVersions(movie.tmdbId)
                                     checkVersionsAfterLoad = true
                                 },
-                                onLongClick = {// --- 修改后的长按逻辑 ---
+                                // 直接在这里使用官方提供的 onLongClick
+                                onLongClick = {
                                     selectedMovieTitle = movie.title
-                                    // 1. 同步记录当前电影并请求版本信息
                                     focusedMovie = movie
                                     viewModel.loadMovieVersions(movie.tmdbId)
-
-                                    // 2. 这里利用一个临时逻辑：由于 movieVersions 是在 ViewModel 里的 StateFlow
-                                    // 我们需要等待它加载。但为了用户体验，我们可以直接在 LaunchedEffect 里监听
-                                    // 或者简单化处理：标记当前是“长按触发”的检查
                                     isLongClickAction = true
                                     checkVersionsAfterLoad = true
+                                },
+                                modifier = Modifier
+                                    .width(178.dp)
+                                    .height(100.dp)
+                                    .onFocusChanged { focusState ->
+                                        if (focusState.isFocused) {
+                                            focusedMovie = movie
+                                        }
+                                    },
+                                // 注意：因为带有点击事件，根据你给的源码，这里应该用 ClickableSurfaceDefaults
+                                shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(8.dp)),
+                                border = ClickableSurfaceDefaults.border(
+                                    focusedBorder = Border(
+                                        border = BorderStroke(2.5.dp, Color.White),
+                                        inset = 0.dp
+                                    )
+                                ),
+                                scale = ClickableSurfaceDefaults.scale(focusedScale = 1.08f),
+                                colors = ClickableSurfaceDefaults.colors(
+                                    containerColor = Color(0xFF252830)
+                                )
+                            ) {
+                                Box(modifier = Modifier.fillMaxSize()) {
+                                    // 优先使用横版背景图(backdrop)，没有则回退海报(poster)
+                                    val cardCover = movie.backdropPath ?: movie.posterPath
+                                    if (cardCover != null) {
+                                        AsyncImage(
+                                            model = ImageRequest.Builder(LocalContext.current)
+                                                .data("https://image.tmdb.org/t/p/w500$cardCover")
+                                                .crossfade(true)
+                                                .build(),
+                                            contentDescription = movie.title,
+                                            contentScale = ContentScale.Crop,
+                                            modifier = Modifier.fillMaxSize()
+                                        )
+                                    } else {
+                                        // 兜底文字显示
+                                        Text(
+                                            text = movie.title,
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = Color.White.copy(alpha = 0.8f),
+                                            maxLines = 2,
+                                            overflow = TextOverflow.Ellipsis,
+                                            modifier = Modifier.align(Alignment.Center)
+                                                .padding(8.dp)
+                                        )
+                                    }
                                 }
-                            )
+                            }
                         }
                     }
                 }
-            }
 
-            // 3. 电影信息展示层 (Foreground) - 位于最上层，独立于滚动内容之外
-            AnimatedContent(
-                targetState = focusedMovie,
-                transitionSpec = {
-                    fadeIn(animationSpec = tween(500)) togetherWith fadeOut(animationSpec = tween(500))
-                },
-                label = "MovieInfoAnimation",
-                modifier = Modifier.fillMaxWidth().align(Alignment.TopStart)
-            ) { movie ->
-                if (movie != null) {
-                    Column(
-                        modifier = Modifier
-                            .padding(start = 56.dp, top = 20.dp)
-                        // 【修改点 1】限制简介宽度为 480.dp，让文字更集中
-
-                    ) {
-                        Text(
-                            text = stringResource(R.string.ui_label_movie_library),
-                            style = MaterialTheme.typography.labelLarge,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
-                        )
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Text(
-                            text = movie.title,
-                            style = MaterialTheme.typography.displaySmall, // 大标题
-                            color = Color.White,
-                            fontWeight = FontWeight.Bold,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-
-                        // 元数据行：年份 | 评分
-                        val year = movie.releaseDate?.take(4) ?: ""
-                        val rating = String.format(LocalLocale.current.platformLocale,"%.1f", movie.voteAverage)
-                        Text(
-                            text = "$year  •  TMDB $rating",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = Color(0xFFFFD700) // 金色强调评分
-                        )
-
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Text(
-                            modifier = Modifier.fillMaxWidth(0.7f),
-                            text = movie.overview,
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = Color.White.copy(alpha = 0.8f),
-                            maxLines = 4,
-
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-                } else {
-                    // 如果没有焦点电影，显示一个占位符，保持布局稳定
-                    Column(
-                        modifier = Modifier
-                            .height(260.dp) // 保持高度和上面 Spacer(320.dp) 一致
-                            .padding(start = 56.dp, top = 20.dp)
-                    ) {
-                        Text(stringResource(R.string.ui_label_movie_library), style = MaterialTheme.typography.labelLarge, color = Color.Gray)
-                    }
-                }
-            }
-
-            // 4. 【修改点 3】滚动提示文字 (位于最底部居中)
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .align(Alignment.BottomCenter)
-                    // 确保提示文字不会紧贴底部
-                    .padding(bottom = 3.dp)
-            ) {
+                // 底部操作提示
                 Text(
                     text = stringResource(R.string.ui_label_remote_control_tip),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = Color.White.copy(alpha = 0.5f), // 半透明
-                    modifier = Modifier.align(Alignment.Center)
+                    style = MaterialTheme.typography.labelMedium,
+                    color = Color.White.copy(alpha = 0.35f),
+                    modifier = Modifier
+                        .align(Alignment.CenterHorizontally)
+                        .padding(bottom = 10.dp)
                 )
             }
         }
     }
 
-
-
-
-    // === 电影版本选择弹窗 (保持原样) ===
+    // ================= 4. 弹窗组件 (结构外移保持不变) =================
     if (showVersionDialog && movieVersions.size > 1) {
         MovieVersionSelectionDialog(
             title = selectedMovieTitle,
@@ -395,7 +408,7 @@ fun MovieLibraryScreen(
                 val connectionName = URLEncoder.encode(version.connectionName, "UTF-8")
                 if (!settingsState.hideDetails) {
                     navController.navigate("MovieDetails/$encodedUri/${version.dataSourceType}/$encodedFileName/$connectionName/${version.tmdbId}")
-                }else{
+                } else {
                     navController.navigate("VideoPlayer/$encodedUri/${version.dataSourceType}/$encodedFileName/$connectionName")
                 }
             },
@@ -404,20 +417,20 @@ fun MovieLibraryScreen(
             }
         )
     }
+
     if (showEditDialog) {
         MyFileDialog(
             onDismiss = { showEditDialog = false },
             fileName = focusedMovie?.fileName,
             onEditClick = {
                 showEditDialog = false
-                navController.navigate("EditTMDBInfoScreen/${URLEncoder.encode(focusedMovie?.videoUri,"UTF-8")}")
+                navController.navigate("EditTMDBInfoScreen/${URLEncoder.encode(focusedMovie?.videoUri, "UTF-8")}")
             },
             onCloseClick = { showEditDialog = false }
         )
     }
 }
 
- //弹窗组件 (保持原样)
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
 fun MovieVersionSelectionDialog(
@@ -430,36 +443,38 @@ fun MovieVersionSelectionDialog(
     Dialog(onDismissRequest = onDismiss) {
         Surface(
             modifier = Modifier
-                .widthIn(max = 600.dp)
-                .height(400.dp),
-            shape = MaterialTheme.shapes.medium,
+                .widthIn(max = 560.dp)
+                .height(380.dp),
+            shape = MaterialTheme.shapes.large,
             colors = SurfaceDefaults.colors(
-                containerColor = Color(0xFF1E1E1E)
+                containerColor = Color(0xFF1E2127)
             )
         ) {
-            Column(modifier = Modifier.padding(24.dp).widthIn(max = 600.dp)
-                .height(400.dp),) {
+            Column(modifier = Modifier.padding(28.dp)) {
                 Text(
-                    text = stringResource(R.string.ui_label_select_version_for_title,title),
-                    style = MaterialTheme.typography.bodyLarge,
+                    text = stringResource(R.string.ui_label_select_version_for_title, title),
+                    style = MaterialTheme.typography.titleLarge,
                     color = Color.White,
-                    maxLines = 2,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                     fontWeight = FontWeight.Bold
                 )
-                // --- 新增提示文字 ---
-                Spacer(modifier = Modifier.height(6.dp))
+                Spacer(modifier = Modifier.height(4.dp))
                 Text(
                     text = stringResource(R.string.ui_label_tip_modify_tmdb_info),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = Color.LightGray // 使用主题色或淡蓝色强调
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
                 )
-                Spacer(modifier = Modifier.height(6.dp))
+                Spacer(modifier = Modifier.height(16.dp))
+
                 if (versions.isEmpty()) {
-                    Text(stringResource(R.string.ui_label_loading), color = Color.Gray)
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Text(stringResource(R.string.ui_label_loading), color = Color.Gray)
+                    }
                 } else {
                     LazyColumn(
-                        Modifier.weight(1f),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
                         items(versions) { version ->
                             ListItem(
@@ -478,7 +493,9 @@ fun MovieVersionSelectionDialog(
                                     Text(
                                         text = version.fileName,
                                         style = MaterialTheme.typography.bodyLarge,
-                                        fontWeight = FontWeight.Bold
+                                        fontWeight = FontWeight.SemiBold,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
                                     )
                                 },
                             )
