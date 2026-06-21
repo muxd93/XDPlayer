@@ -19,6 +19,18 @@
     <string name="setting_hide_net_speed">隐藏播放页网速显示</string>
     <string name="setting_app_lang">App语言</string>
 
+    <string name="setting_elder_mode">老人模式</string>
+    <string name="setting_elder_mode_sub">简化界面，大字体大按钮，适合老年用户</string>
+    <string name="setting_elder_mode_confirm_title">切换到老人模式</string>
+    <string name="setting_elder_mode_confirm_msg">切换后界面将变为简化版，需要输入PIN码才能切回标准模式。确定要切换吗？</string>
+    <string name="setting_elder_slot_count">老人模式栏位数量</string>
+    <string name="setting_elder_slot_count_sub">老人模式首页显示的栏位数量</string>
+    <string name="setting_elder_show_recent">显示最近播放</string>
+    <string name="setting_elder_auto_resume">自动续播</string>
+    <string name="setting_elder_auto_resume_sub">播放时自动续播，不弹确认框</string>
+    <string name="setting_elder_stay_on_page">播放结束停留</string>
+    <string name="setting_elder_stay_on_page_sub">播放结束后停留在当前页面，不自动返回</string>
+
     <string name="setting_audio_lang">音频首选语言</string>
     <string name="setting_default_player">默认播放器内核</string>
     <string name="setting_sub_lang">字幕首选语言</string>
@@ -400,5 +412,76 @@
     <string name="ui_label_no_poster">无海报</string>
     <string name="ui_label_subtitle_off">关闭字幕</string>
     <string name="ui_label_subtitle_file_not_found_hint">(未找到文件，可能正在缓冲)</string>
+
+    <!-- SMB 自动扫描 -->
+    <string name="ui_label_scan_lan">扫描局域网</string>
+    <string name="ui_label_scanning">扫描中…</string>
+    <string name="ui_label_scan_complete">扫描完成</string>
+    <string name="ui_label_scan_failed">扫描失败: %s</string>
+    <string name="ui_label_rescan">重新扫描</string>
+    <string name="ui_label_stop_scan">停止扫描</string>
+    <string name="ui_label_discovered_devices">发现 %d 台设备</string>
+    <string name="ui_label_no_smb_found">未发现 SMB 服务</string>
+    <string name="ui_label_no_auth">免认证</string>
+    <string name="ui_label_requires_auth">需要认证</string>
+    <string name="ui_label_one_click_connect">一键连接</string>
+    <string name="ui_label_saved">已保存</string>
+    <string name="ui_label_connect_and_save">连接并保存</string>
+    <string name="ui_label_enter_credentials">输入凭据</string>
+    <string name="ui_label_response_time">%dms</string>
+
+    <!-- 适老化模式 -->
+    <string name="elder_home">首页</string>
+    <string name="elder_all_apps">全部应用</string>
+    <string name="elder_all_apps_count">全部应用（%1$d）</string>
+    <string name="elder_recent">最近播放</string>
+    <string name="elder_loading">加载中...</string>
+    <string name="elder_press_back_again_to_exit">再按一次返回键退出</string>
+    <string name="elder_enter_pin">输入 PIN 码</string>
+    <string name="elder_set_pin">设置 PIN 码</string>
+    <string name="elder_enter_pin_hint">请输入 4 位数字 PIN 码以切换到标准模式</string>
+    <string name="elder_set_pin_hint">首次使用，请设置 4 位数字 PIN 码</string>
+    <string name="elder_confirm_pin_hint">请再次输入 PIN 码以确认</string>
+    <string name="elder_pin_error">PIN 码错误</string>
+    <string name="elder_pin_mismatch">两次输入的 PIN 码不一致</string>
+    <string name="elder_pin_too_many_attempts">错误次数过多，请稍后再试</string>
+    <string name="elder_cancel">取消</string>
+    <string name="elder_back">返回</string>
+    <string name="elder_exit">退出</string>
+    <string name="elder_configure_slot">配置栏位</string>
+    <string name="elder_select_slot_type">请选择栏位类型</string>
+    <string name="elder_folder">文件夹</string>
+    <string name="elder_video">视频</string>
+    <string name="elder_app">应用</string>
+    <string name="elder_loading_apps">加载应用列表...</string>
+    <string name="elder_no_apps_found">未找到可启动的应用</string>
+    <string name="elder_select_app_count">选择应用（共 %1$d 个）</string>
+    <string name="elder_slot_needs_config">%1$s 栏位需要指定路径等信息</string>
+    <string name="elder_slot_config_hint">请通过 Web 配置页面或标准模式设置</string>
+    <string name="elder_no_videos">暂无视频</string>
+    <string name="elder_app_launch_failed">应用启动失败，可能已被卸载</string>
+    <string name="elder_seek_back">后退%1$d秒</string>
+    <string name="elder_seek_forward">前进%1$d秒</string>
+    <string name="elder_play">播放</string>
+    <string name="elder_pause">暂停</string>
+    <string name="elder_mode_switch_hint">长按下键可切换模式</string>
+    <string name="elder_slot_config_help_title">此类栏位需要家人或管理员协助配置</string>
+    <string name="elder_slot_config_help_step1">1. 请家人在同一 Wi-Fi 下打开 Web 配置页面</string>
+    <string name="elder_slot_config_help_step2">2. 或请家人切换到标准模式后配置</string>
+    <string name="elder_slot_config_help_contact">如需帮助，请联系家人或设备管理员</string>
+    <string name="elder_no_focusable_element">无可聚焦元素</string>
+    <string name="elder_video_load_failed">视频加载失败</string>
+    <string name="elder_exit_player">退出播放</string>
+    <string name="elder_progress_hint">按左右键快退/快进</string>
+    <string name="elder_select_data_source">请选择%1$s的数据源</string>
+    <string name="elder_local_storage">本地存储</string>
+    <string name="elder_smb">SMB</string>
+    <string name="elder_select_folder">选择文件夹</string>
+    <string name="elder_select_video">选择视频</string>
+    <string name="elder_select_this_folder">选择此文件夹</string>
+    <string name="elder_no_files">暂无文件</string>
+    <string name="elder_select_smb_connection">选择 SMB 连接</string>
+    <string name="elder_no_smb_connections">暂无 SMB 连接，请先在标准模式中添加</string>
+    <string name="elder_smb_load_failed">加载失败</string>
 
 </resources>

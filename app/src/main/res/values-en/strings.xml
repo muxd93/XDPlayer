@@ -19,6 +19,18 @@
     <string name="setting_hide_net_speed">Hide Network Speed</string>
     <string name="setting_app_lang">App Language</string>
 
+    <string name="setting_elder_mode">Elder Mode</string>
+    <string name="setting_elder_mode_sub">Simplified UI with large text and buttons, designed for elderly users</string>
+    <string name="setting_elder_mode_confirm_title">Switch to Elder Mode</string>
+    <string name="setting_elder_mode_confirm_msg">The interface will switch to a simplified version. You will need a PIN to switch back. Are you sure?</string>
+    <string name="setting_elder_slot_count">Elder Mode Slot Count</string>
+    <string name="setting_elder_slot_count_sub">Number of slots on elder mode home screen</string>
+    <string name="setting_elder_show_recent">Show Recent</string>
+    <string name="setting_elder_auto_resume">Auto Resume</string>
+    <string name="setting_elder_auto_resume_sub">Auto resume playback without confirmation dialog</string>
+    <string name="setting_elder_stay_on_page">Stay on Page After End</string>
+    <string name="setting_elder_stay_on_page_sub">Stay on current page after playback ends</string>
+
     <string name="setting_audio_lang">Preferred Audio</string>
     <string name="setting_default_player">Default Player Engine</string>
     <string name="setting_sub_lang">Preferred Subtitle</string>
@@ -369,7 +381,6 @@
     <string name="ui_label_no_video_tracks_in_file">No video tracks in this file</string>
     <string name="ui_label_dolby_vision">Dolby Vision</string>
     <string name="ui_label_standard_definition">Standard Definition</string>
-
     <string name="setting_default_player_vlc">VLC</string>
     <string name="setting_default_player_exo">ExoPlayer</string>
     <string name="setting_exo_audio_decode_mode">ExoPlayer Audio Decode Mode (ExoPlayer Only)</string>
@@ -397,4 +408,75 @@
     <string name="ui_label_no_poster">No Poster</string>
     <string name="ui_label_subtitle_off">Turn off Subtitles</string>
     <string name="ui_label_subtitle_file_not_found_hint">(File not found, may be buffering)</string>
+
+    <!-- SMB auto scan -->
+    <string name="ui_label_scan_lan">Scan LAN</string>
+    <string name="ui_label_scanning">Scanning…</string>
+    <string name="ui_label_scan_complete">Scan complete</string>
+    <string name="ui_label_scan_failed">Scan failed: %s</string>
+    <string name="ui_label_rescan">Rescan</string>
+    <string name="ui_label_stop_scan">Stop</string>
+    <string name="ui_label_discovered_devices">%d devices found</string>
+    <string name="ui_label_no_smb_found">No SMB service found</string>
+    <string name="ui_label_no_auth">No Auth</string>
+    <string name="ui_label_requires_auth">Auth Required</string>
+    <string name="ui_label_one_click_connect">One-Click Connect</string>
+    <string name="ui_label_saved">Saved</string>
+    <string name="ui_label_connect_and_save">Connect &amp; Save</string>
+    <string name="ui_label_enter_credentials">Enter Credentials</string>
+    <string name="ui_label_response_time">%dms</string>
+
+    <!-- Elder Mode -->
+    <string name="elder_home">Home</string>
+    <string name="elder_all_apps">All Apps</string>
+    <string name="elder_all_apps_count">All Apps (%1$d)</string>
+    <string name="elder_recent">Recent</string>
+    <string name="elder_loading">Loading...</string>
+    <string name="elder_press_back_again_to_exit">Press back again to exit</string>
+    <string name="elder_enter_pin">Enter PIN</string>
+    <string name="elder_set_pin">Set PIN</string>
+    <string name="elder_enter_pin_hint">Enter 4-digit PIN to switch to standard mode</string>
+    <string name="elder_set_pin_hint">First time use, please set a 4-digit PIN</string>
+    <string name="elder_confirm_pin_hint">Please enter PIN again to confirm</string>
+    <string name="elder_pin_error">Wrong PIN</string>
+    <string name="elder_pin_mismatch">PINs do not match</string>
+    <string name="elder_pin_too_many_attempts">Too many wrong attempts, try later</string>
+    <string name="elder_cancel">Cancel</string>
+    <string name="elder_back">Back</string>
+    <string name="elder_exit">Exit</string>
+    <string name="elder_configure_slot">Configure Slot</string>
+    <string name="elder_select_slot_type">Select slot type</string>
+    <string name="elder_folder">Folder</string>
+    <string name="elder_video">Video</string>
+    <string name="elder_app">App</string>
+    <string name="elder_loading_apps">Loading app list...</string>
+    <string name="elder_no_apps_found">No launchable apps found</string>
+    <string name="elder_select_app_count">Select app (%1$d total)</string>
+    <string name="elder_slot_needs_config">%1$s slot requires path info</string>
+    <string name="elder_slot_config_hint">Please configure via Web config page or standard mode</string>
+    <string name="elder_no_videos">No videos</string>
+    <string name="elder_app_launch_failed">App launch failed, may have been uninstalled</string>
+    <string name="elder_seek_back">Back %1$d seconds</string>
+    <string name="elder_seek_forward">Forward %1$d seconds</string>
+    <string name="elder_play">Play</string>
+    <string name="elder_pause">Pause</string>
+    <string name="elder_mode_switch_hint">Long press DOWN to switch mode</string>
+    <string name="elder_slot_config_help_title">This slot type requires family or admin to configure</string>
+    <string name="elder_slot_config_help_step1">1. Ask family to open Web config page on the same Wi-Fi</string>
+    <string name="elder_slot_config_help_step2">2. Or ask family to switch to standard mode and configure</string>
+    <string name="elder_slot_config_help_contact">For help, please contact family or device admin</string>
+    <string name="elder_no_focusable_element">No focusable element</string>
+    <string name="elder_video_load_failed">Video load failed</string>
+    <string name="elder_exit_player">Exit player</string>
+    <string name="elder_progress_hint">Press LEFT/RIGHT to seek</string>
+    <string name="elder_select_data_source">Select data source for %1$s</string>
+    <string name="elder_local_storage">Local Storage</string>
+    <string name="elder_smb">SMB</string>
+    <string name="elder_select_folder">Select Folder</string>
+    <string name="elder_select_video">Select Video</string>
+    <string name="elder_select_this_folder">Select This Folder</string>
+    <string name="elder_no_files">No files</string>
+    <string name="elder_select_smb_connection">Select SMB Connection</string>
+    <string name="elder_no_smb_connections">No SMB connections, please add in standard mode first</string>
+    <string name="elder_smb_load_failed">Load failed</string>
 </resources>

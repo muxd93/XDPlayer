@@ -63,6 +63,7 @@ fun TvTextField(
     colors: ClickableSurfaceColors = ClickableSurfaceDefaults.colors(),
     placeholder: String = "",
     textStyle: TextStyle = TextStyle.Default,
+    visualTransformation: VisualTransformation = VisualTransformation.None,
 ) {
     // 1. 为每个输入框创建独立的状态
     val interactionSource = remember { MutableInteractionSource() }
@@ -105,6 +106,7 @@ fun TvTextField(
             value = value,
             textStyle = textStyle.copy(color = Color.White),
             onValueChange = onValueChange,
+            visualTransformation = visualTransformation,
             // --- 修改部分：添加 cursorBrush 参数 ---
             cursorBrush = SolidColor(Color.White), // 设置光标颜色为白色
             // --- 修改部分结束 ---
@@ -141,7 +143,6 @@ fun TvTextField(
             keyboardActions = KeyboardActions(
                 onAny = { }
             ),
-            visualTransformation = VisualTransformation.None,
             decorationBox = { innerTextField ->
                 if (value.isEmpty()) {
                     Box(

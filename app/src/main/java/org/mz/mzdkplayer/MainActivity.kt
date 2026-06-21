@@ -100,6 +100,7 @@ class MainActivity : AppCompatActivity() {
         handleIntent(intent)
         RepositoryProvider.init(this)
         SettingsRepository.init(this)
+        (application as MzDkPlayerApplication).startWebConfigServerIfNeeded()
         setContent {
             var showSplash by remember { mutableStateOf(true) }
             if (showSplash) {

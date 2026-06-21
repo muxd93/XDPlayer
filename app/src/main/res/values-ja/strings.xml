@@ -372,6 +372,22 @@
     <string name="ui_label_no_video_tracks_in_file">このファイルにビデオトラックはありません</string>
     <string name="ui_label_dolby_vision">Dolby Vision</string>
     <string name="ui_label_standard_definition">標準画質</string>
+    <!-- SMB 自動スキャン -->
+    <string name="ui_label_scan_lan">LANをスキャン</string>
+    <string name="ui_label_scanning">スキャン中…</string>
+    <string name="ui_label_scan_complete">スキャン完了</string>
+    <string name="ui_label_scan_failed">スキャン失敗: %s</string>
+    <string name="ui_label_rescan">再スキャン</string>
+    <string name="ui_label_stop_scan">停止</string>
+    <string name="ui_label_discovered_devices">%d 台のデバイスを発見</string>
+    <string name="ui_label_no_smb_found">SMBサービスが見つかりません</string>
+    <string name="ui_label_no_auth">認証不要</string>
+    <string name="ui_label_requires_auth">認証が必要</string>
+    <string name="ui_label_one_click_connect">ワンクリック接続</string>
+    <string name="ui_label_saved">保存済み</string>
+    <string name="ui_label_connect_and_save">接続して保存</string>
+    <string name="ui_label_enter_credentials">認証情報を入力</string>
+    <string name="ui_label_response_time">%dms</string>
 
     <string name="setting_default_player_vlc">VLC</string>
     <string name="setting_default_player_exo">ExoPlayer</string>

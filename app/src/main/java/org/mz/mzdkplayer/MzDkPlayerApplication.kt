@@ -9,6 +9,8 @@ import androidx.media3.datasource.cache.Cache
 import androidx.media3.datasource.cache.LeastRecentlyUsedCacheEvictor
 import androidx.media3.datasource.cache.SimpleCache
 import org.mz.mzdkplayer.data.model.AudioItem
+import org.mz.mzdkplayer.data.repository.SettingsRepository
+import org.mz.mzdkplayer.tool.WebConfigServer
 import java.io.File
 
 @UnstableApi
@@ -17,6 +19,7 @@ class MzDkPlayerApplication: Application() {
         @SuppressLint("StaticFieldLeak")
         lateinit var context: Context
         lateinit var downloadCache: Cache
+        lateinit var webConfigServer: WebConfigServer
 
         // 为不同类型的共享数据使用不同的 Map
         private val stringListMap = mutableMapOf<String, List<AudioItem>>()
@@ -39,9 +42,23 @@ class MzDkPlayerApplication: Application() {
     override fun onCreate() {
         super.onCreate()
         context = applicationContext
+        SettingsRepository.init(this)
         val cacheDir = File(filesDir, "exoplayer_cache")
-        val evictor = LeastRecentlyUsedCacheEvictor(5000 * 1024 * 1024)
+        val evictor = LeastRecentlyUsedCacheEvictor(SettingsRepository.exoCacheSizeMb.toLong() * 1024 * 1024)
         val databaseProvider = StandaloneDatabaseProvider(this)
         downloadCache = SimpleCache(cacheDir, evictor, databaseProvider)
+        webConfigServer = WebConfigServer()
+    }
+
+    fun startWebConfigServerIfNeeded() {
+        if (SettingsRepository.webConfigEnabled) {
+            try {
+                if (!webConfigServer.isAlive) {
+                    webConfigServer.start()
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
     }
 }

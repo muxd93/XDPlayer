@@ -5,13 +5,6 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.hierynomus.msfscc.FileAttributes
 import com.hierynomus.msfscc.fileinformation.FileIdBothDirectoryInformation
-import com.hierynomus.protocol.transport.TransportException
-import com.hierynomus.smbj.SMBClient
-import com.hierynomus.smbj.SmbConfig
-import com.hierynomus.smbj.auth.AuthenticationContext
-import com.hierynomus.smbj.connection.Connection
-import com.hierynomus.smbj.session.Session
-import com.hierynomus.smbj.share.DiskShare
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -20,7 +13,8 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import org.mz.mzdkplayer.data.model.FileConnectionStatus
-import java.util.concurrent.TimeUnit
+import org.mz.mzdkplayer.tool.SmbConnectionManager
+import org.mz.mzdkplayer.tool.SmbUtils
 
 import kotlin.collections.forEach
 
@@ -31,74 +25,50 @@ class SMBConViewModel : ViewModel() {
     private val _fileList = MutableStateFlow<List<SMBFileItem>>(emptyList())
     val fileList: StateFlow<List<SMBFileItem>> = _fileList
 
-    private var connection: Connection? = null
-    private var session: Session? = null
-    private var share: DiskShare? = null
-    private var client: SMBClient? = null
+    private var connectionId: String? = null
     private val mutex = Mutex()  // 协程互斥锁
-    fun connectToSMB(ip: String, username: String, password: String, shareName: String) {
+    private val connectionManager = SmbConnectionManager.getInstance()
 
+    fun connectToSMB(ip: String, username: String, password: String, shareName: String) {
         viewModelScope.launch {
             _connectionStatus.value = FileConnectionStatus.Connecting
             mutex.withLock {
                 try {
-
-                    withContext(Dispatchers.IO) {
-
-                        if (!isConnected()) {  // 避免重复连接
-                            client = SMBClient()
-                            Log.d("_connectionStatus1", _connectionStatus.value.toString())
-                            connection = client?.connect(ip)
-                            val auth = AuthenticationContext(username, password.toCharArray(), null)
-                            session = connection!!.authenticate(auth)
-                            share = session!!.connectShare(shareName) as DiskShare
-                        }
-
+                    val id = "$ip:$shareName"
+                    val diskShare = connectionManager.getOrConnect(id, ip, shareName, username, password)
+                    if (diskShare != null) {
+                        connectionId = id
+                        _connectionStatus.value = FileConnectionStatus.Connected
+                    } else {
+                        _connectionStatus.value = FileConnectionStatus.Error("连接失败: 超过最大重试次数")
                     }
-
-
-                    _connectionStatus.value = FileConnectionStatus.Connected
-
                 } catch (e: Exception) {
                     Log.e("SMB", "连接失败$e", e)
                     _connectionStatus.value = FileConnectionStatus.Error("连接失败: ${e.message}")
-                    //disconnectSMB()
                 }
             }
         }
     }
 
     fun testConnectSMB(ip: String, username: String, password: String, shareName: String) {
-
         viewModelScope.launch {
-
             mutex.withLock {
                 try {
-
-                    withContext(Dispatchers.IO) {
-                        _connectionStatus.value = FileConnectionStatus.Connecting
-                        if (!isConnected()) {  // 避免重复连接
-                            val clientConfig = SmbConfig.builder()
-                                .withTimeout(15, TimeUnit.SECONDS) // 连接超时
-                                .build()
-                            client = SMBClient(clientConfig)
-                            connection = client?.connect(ip)
-                            val auth = AuthenticationContext(username, password.toCharArray(), null)
-                            session = connection!!.authenticate(auth)
-                            share = session!!.connectShare(shareName) as DiskShare
-                        }
-
+                    _connectionStatus.value = FileConnectionStatus.Connecting
+                    val id = "$ip:$shareName"
+                    val diskShare = connectionManager.getOrConnect(id, ip, shareName, username, password)
+                    if (diskShare != null) {
+                        connectionId = id
+                        _connectionStatus.value = FileConnectionStatus.Connected
+                        listSMBFiles(SMBConfig(ip, shareName, "/", username, password))
+                    } else {
+                        _connectionStatus.value = FileConnectionStatus.Error("连接失败: 超过最大重试次数")
+                        _fileList.value = emptyList()
                     }
-
-
-                    _connectionStatus.value = FileConnectionStatus.Connected
-                    listSMBFiles(SMBConfig(ip, shareName, "/", username, password)) // 获取文件列表
-                    Log.d("_connectionStatus1", _connectionStatus.value.toString())
                 } catch (e: Exception) {
                     Log.e("SMB", "连接失败$e", e)
                     _connectionStatus.value = FileConnectionStatus.Error("连接失败: ${e.message}")
                     _fileList.value = emptyList()
-                    //disconnectSMB()
                 }
             }
         }
@@ -106,11 +76,11 @@ class SMBConViewModel : ViewModel() {
 
     fun listSMBFiles(config: SMBConfig) {
         viewModelScope.launch {
-//            if (_connectionStatus.value != FileConnectionStatus.Connected &&
-//                _connectionStatus.value !is FileConnectionStatus.FilesLoaded) {
-//                _connectionStatus.value = FileConnectionStatus.Error("未连接")
-//                return@launch
-//            }
+            if (_connectionStatus.value != FileConnectionStatus.Connected &&
+                _connectionStatus.value !is FileConnectionStatus.FilesLoaded) {
+                _connectionStatus.value = FileConnectionStatus.Error("未连接")
+                return@launch
+            }
 
             Log.d("listSMBFiles", "正在列出文件")
             mutex.withLock {
@@ -124,9 +94,13 @@ class SMBConViewModel : ViewModel() {
                             val cleanPath = config.path.let {
                                 if (it == "/") "\\" else it.replace("/", "\\").trimEnd('\\')
                             }
+                            // 每次都通过 Manager 获取可用 share, 避免缓存失效引用
+                            val activeShare = connectionId?.let { id ->
+                                connectionManager.getOrConnect(id, config.server, config.share, config.username, config.password)
+                            }
                             val startTime = System.currentTimeMillis()
                             val fileList = mutableListOf<SMBFileItem>()
-                            share?.list(cleanPath)
+                            activeShare?.list(cleanPath)
                                 ?.forEach { fileInfo: FileIdBothDirectoryInformation ->
                                     val fileName = fileInfo.fileName
                                     if (fileName != "." && fileName != "..") {
@@ -182,65 +156,38 @@ class SMBConViewModel : ViewModel() {
 
 
     // 断开连接
+    // 注意: connectionManager.disconnect 是全局操作, 会移除 Manager 中的连接条目,
+    // 影响所有持有该连接的组件。当前仅 SMBConViewModel 使用 SmbConnectionManager,
+    // 因此此处简化处理直接断开; 若未来有多组件复用连接, 需改为引用计数管理。
     fun disconnectSMB() {
-        viewModelScope.launch(Dispatchers.IO) {
-            try {
-                share?.close()
-            } catch (e: TransportException) {
-                Log.w("SMB", "Share 已断开，无需关闭")
-            } finally {
-                share = null
-            }
-
-            try {
-                session?.close()
-            } catch (e: TransportException) {
-                Log.w("SMB", "Session 已断开，无需关闭")
-            } finally {
-                session = null
-            }
-
-            try {
-                connection?.close()
-            } catch (e: TransportException) {
-                Log.w("SMB", "Connection 已断开，无需关闭")
-            } finally {
-                connection = null
-            }
-
-//            withContext(Dispatchers.Main) {
-//                _connectionStatus.value = FileConnectionStatus.Disconnected
-//                _fileList.value = emptyList()
-//            }
-        }
-        // 回到主线程更新 UI 状态
+        connectionId?.let { connectionManager.disconnect(it) }
+        connectionId = null
         _connectionStatus.value = FileConnectionStatus.Disconnected
         _fileList.value = emptyList()
-        Log.i("SMBCON",_connectionStatus.value.toString())
+        Log.i("SMBCON", _connectionStatus.value.toString())
     }
 
     fun isConnected(): Boolean {
-        return connection?.isConnected == true &&
-                share != null
+        val id = connectionId ?: return false
+        return connectionManager.getState(id) == SmbConnectionManager.ConnectionState.CONNECTED
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        // ViewModel 销毁时断开连接（导航离开时触发，配置变更不会触发）
+        disconnectSMB()
     }
 
 
     fun parseSMBPath(path: String): SMBConfig {
-        // 格式: smb://username:password@server/share/path/to/directory
-        val pattern = Regex("^smb://(?:([^:]+):([^@]+)@)?([^/]+)/([^/]+)(/.*)?$")
-        val match = pattern.find(path) ?: return SMBConfig("", "", "", "", "")
-
-        val (username, password, server, share, rawPath) = match.destructured
-        val cleanPath = rawPath.trim().let {
-            it.ifEmpty { "/" }
-        }
-
+        // 委托给 SmbUtils.parseSMBPath，保持与 WebConfigServer 等其他调用方一致的解析逻辑
+        val info = SmbUtils.parseSMBPath(path)
         return SMBConfig(
-            server = server,
-            share = share,
-            path = cleanPath,
-            username = username.ifEmpty { "guest" },
-            password = password.ifEmpty { "" }
+            server = info.server,
+            share = info.share,
+            path = info.path,
+            username = info.username,
+            password = info.password
         )
     }
 
@@ -251,7 +198,7 @@ class SMBConViewModel : ViewModel() {
         username: String,
         password: String
     ): String {
-        return if (username.isNotEmpty() && password.isNotEmpty()) {
+        return if (username.isNotEmpty()) {
             "smb://$username:$password@$server/$share$path"
         } else {
             "smb://$server/$share$path"

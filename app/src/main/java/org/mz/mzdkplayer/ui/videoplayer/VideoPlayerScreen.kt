@@ -85,6 +85,9 @@ import org.mz.mzdkplayer.data.model.DanmakuScreenRatio
 import org.mz.mzdkplayer.data.model.MediaHistoryRecord
 
 import org.mz.mzdkplayer.data.repository.DanmakuSettingsManager
+import org.mz.mzdkplayer.data.repository.ElderModeConfig
+import org.mz.mzdkplayer.data.repository.ModeManager
+import org.mz.mzdkplayer.data.repository.SettingsRepository
 import org.mz.mzdkplayer.player.core.IMzPlayer
 import org.mz.mzdkplayer.player.core.MzIsoTitle
 import org.mz.mzdkplayer.player.exo.MzExoPlayer
@@ -98,6 +101,7 @@ import org.mz.mzdkplayer.tool.Tools.toSafeInt
 import org.mz.mzdkplayer.tool.WebDavDataSource
 import org.mz.mzdkplayer.tool.handleDPadKeyEvents
 
+import org.mz.mzdkplayer.ui.elder.ElderPlayerOverlay
 import org.mz.mzdkplayer.ui.screen.common.LoadingScreen
 import org.mz.mzdkplayer.ui.screen.common.VAErrorScreen
 import org.mz.mzdkplayer.ui.screen.vm.MediaHistoryViewModel
@@ -150,7 +154,8 @@ fun VideoPlayerScreen(
     connectionName: String,
     mediaHistoryViewModel: MediaHistoryViewModel,
     useVlc: Boolean = false, // 开关：让用户或者设置决定用哪个内核
-    settingsViewModel: SettingsViewModel = viewModel()
+    settingsViewModel: SettingsViewModel = viewModel(),
+    onBack: () -> Unit = {}
 ) {
     // 获取当前 Compose 上下文
     val context = LocalContext.current
@@ -164,7 +169,11 @@ fun VideoPlayerScreen(
         }
     }
     // 记住并创建视频播放器状态管理器
-    val videoPlayerState = rememberVideoPlayerState(hideSeconds = 6)
+    val isElderMode = ModeManager.isElderMode
+    // 通过 StateFlow 实时响应 Web 配置页面的修改
+    val elderConfigState by ElderModeConfig.configFlow.collectAsState()
+    val elderConfig = if (isElderMode) elderConfigState else null
+    val videoPlayerState = rememberVideoPlayerState(hideSeconds = elderConfig?.controlHideSeconds ?: 6)
     // 获取 ViewModel 实例
     val videoPlayerViewModel: VideoPlayerViewModel = viewModel()
     // 状态：是否显示 Toast 提示
@@ -453,9 +462,10 @@ fun VideoPlayerScreen(
     }
 
     // 定义自定义字幕样式
+    val elderSubFontSize = if (isElderMode) maxOf(settingsState.subFontSize, (elderConfig?.minSubtitleFontSize ?: 36).toFloat()) else settingsState.subFontSize
     val customSubtitleStyle = TextStyle(
         color = Color(settingsState.subColor), // 字幕颜色为白色
-        fontSize = settingsState.subFontSize.sp,     // 字体大小
+        fontSize = elderSubFontSize.sp,     // 字体大小
         shadow = Shadow(
             color = Color.Black, // 黑色阴影
             offset = Offset(3f, 3f),
@@ -495,7 +505,12 @@ fun VideoPlayerScreen(
 
             if (historySeekPos > 0 && !hasTriggeredTimer) {
                 player.seekTo(historySeekPos)
-                showHistoryTip = true
+                // 老人模式：自动续播，不弹确认弹窗
+                if (elderConfig?.autoResume == true) {
+                    showHistoryTip = false
+                } else {
+                    showHistoryTip = true
+                }
                 hasTriggeredTimer = true
             }
         } else if (playerStatus == VideoPlayerStatus.READY) {
@@ -530,7 +545,8 @@ fun VideoPlayerScreen(
                 player,
                 videoPlayerState,
                 pulseState,
-                videoPlayerViewModel
+                videoPlayerViewModel,
+                seekStepMs = (elderConfig?.seekStepSeconds?.toLong()?.times(1000)) ?: 30_000L
             )
             .background(Color(0, 0, 0)) // 黑色背景
             .focusable() // 可获得焦点
@@ -620,16 +636,18 @@ fun VideoPlayerScreen(
             )
         }
 
-        //弹幕层
-        AkDanmakuPlayer(
-            modifier = Modifier
-                .fillMaxSize()
-                .align(Alignment.TopCenter), // 顶部居中对齐
-            danmakuPlayer = mDanmakuPlayer // 传递弹幕播放器实例
-        )
+        //弹幕层（老人模式根据配置隐藏弹幕）
+        if (elderConfig?.hideDanmaku != true) {
+            AkDanmakuPlayer(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .align(Alignment.TopCenter), // 顶部居中对齐
+                danmakuPlayer = mDanmakuPlayer // 传递弹幕播放器实例
+            )
+        }
 
-        // 实时网速显示
-        if (isPlaying && !settingsState.hideNetworkSpeed) {
+        // 实时网速显示（老人模式根据配置隐藏网速）
+        if (elderConfig?.hideNetworkSpeed != true && isPlaying && !settingsState.hideNetworkSpeed) {
             NetworkSpeedIndicator(
                 networkSpeed = networkSpeed, // 传递网络速度
                 modifier = Modifier
@@ -638,43 +656,67 @@ fun VideoPlayerScreen(
             )
         }
         val statusText = playerStatus.asDisplayString()
-        // 视频播放器覆盖层 (包含控制按钮等)
-        VideoPlayerOverlay(
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .onFocusChanged {
+        // 视频播放器覆盖层（老人模式使用简化控制栏）
+        if (isElderMode) {
+            val elderSeekMs = (elderConfig?.seekStepSeconds?.toLong()?.times(1000)) ?: 10_000L
+            ElderPlayerOverlay(
+                isPlaying = isPlaying,
+                contentCurrentPosition = contentCurrentPosition,
+                contentDuration = player.duration,
+                state = videoPlayerState,
+                focusRequester = focusRequester,
+                onPlayPauseToggle = { shouldPlay ->
+                    if (shouldPlay) player.play() else player.pause()
+                },
+                onSeekBack = { player.seekBack(elderSeekMs) },
+                onSeekForward = { player.seekForward(elderSeekMs) },
+                onSeek = { player.seekTo(player.duration.times(it).toLong()) },
+                onExit = {
+                    // Issue 10: 老人模式显式退出按钮, 返回上一页
+                    onBack()
+                },
+                seekStepMs = elderSeekMs,
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .onFocusChanged {
+                        videoPlayerViewModel.conFocus = it.hasFocus
+                    }
+            )
+        } else {
+            VideoPlayerOverlay(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .onFocusChanged {
                     videoPlayerViewModel.conFocus =
-                        it.isFocused
+                        it.hasFocus
                 }, // 底部居中
-            focusRequester = focusRequester, // 焦点请求器
-            state = videoPlayerState, // 播放器状态
-            isPlaying = isPlaying, // 播放状态
-            centerButton = { VideoPlayerPulse(pulseState) }, // 中心脉冲按钮
-            subtitles = { }, // 子标题 (未实现)
-            controls = {
-                // 控制按钮区域
-                VideoPlayerControls(
-                    isPlaying, // 播放状态
-                    contentCurrentPosition, // 当前位置
-                    player, // ExoPlayer 实例
-                    videoPlayerState, // 播放器状态
-                    focusRequester, // 焦点请求器
-                    fileName, // 标题 (示例)
-                    statusText, // 副标题 (示例)
-                    "2022/1/20", // 第三行文本 (示例)
-                    videoPlayerViewModel, // ViewModel
-                    isoTitles=isoTitles,
-                    mediaUri = mediaUri,
-                    mDanmakuPlayer, // 弹幕播放器
+                focusRequester = focusRequester, // 焦点请求器
+                state = videoPlayerState, // 播放器状态
+                isPlaying = isPlaying, // 播放状态
+                centerButton = { VideoPlayerPulse(pulseState) }, // 中心脉冲按钮
+                subtitles = { }, // 子标题 (未实现)
+                controls = {
+                    // 控制按钮区域
+                    VideoPlayerControls(
+                        isPlaying, // 播放状态
+                        contentCurrentPosition, // 当前位置
+                        player, // ExoPlayer 实例
+                        videoPlayerState, // 播放器状态
+                        focusRequester, // 焦点请求器
+                        fileName, // 标题 (示例)
+                        statusText, // 副标题 (示例)
+                        "2022/1/20", // 第三行文本 (示例)
+                        videoPlayerViewModel, // ViewModel
+                        isoTitles=isoTitles,
+                        mediaUri = mediaUri,
+                        mDanmakuPlayer, // 弹幕播放器
 
-                    settingsManager, // 弹幕设置管理器，用于保存可见性状态
-                    ::getDanmakuConfig // 传递获取配置的方法
-                )
-            },
-            atpFocus = videoPlayerViewModel.atpFocus // 音轨/字幕面板焦点状态
-        )
-        LaunchedEffect(Unit) {
-            reRequester.requestFocus()
+                        settingsManager, // 弹幕设置管理器，用于保存可见性状态
+                        ::getDanmakuConfig // 传递获取配置的方法
+                    )
+                },
+                atpFocus = videoPlayerViewModel.atpFocus // 音轨/字幕面板焦点状态
+            )
         }
         // 历史记录跳转提示浮窗
         AnimatedVisibility(
@@ -733,25 +775,12 @@ fun VideoPlayerScreen(
 //                showToast = true
 //
 //        }
-        BackHandler(backPressState == BackPress.Idle) {
-//            if (videoPlayerState.controlsVisible && !videoPlayerViewModel.conFocus) {
-//                // 如果控制栏显示，则隐藏控制栏
-//                //videoPlayerState.hideControls()
-//            } else if (videoPlayerState.controlsVisible ){
-//                // 如果控制栏不显示，则执行退出逻辑
-//                videoPlayerState.hideControls()
-//            }else{
-            if (backPressState == BackPress.Idle && !videoPlayerState.controlsVisible) {
-                backPressState = BackPress.InitialTouch
-                showToast = true
-            }
-
-
+        BackHandler(backPressState == BackPress.Idle && !videoPlayerState.controlsVisible) {
+            backPressState = BackPress.InitialTouch
+            showToast = true
         }
         BackHandler(videoPlayerState.controlsVisible) {
-            if (!videoPlayerViewModel.conFocus) {
-                videoPlayerState.hideControls()
-            }
+            videoPlayerState.hideControls()
         }
 
 
@@ -768,26 +797,18 @@ fun VideoPlayerScreen(
                 .background(
                     Color.Black.copy(0.8f), shape = RoundedCornerShape(2.dp) // 半透明黑色背景和圆角
                 )
-                // 处理 D-Pad 事件
+                // 处理 D-Pad 事件（仅消费右键防止焦点逃逸, 上下键放行给列表导航）
                 .handleDPadKeyEvents(
-                    onRight = {
-                        true
-                    },
-                    onUp = {
-                        true
-                    },
-                    onDown = {
-                        true
-                    }
+                    onRight = {}
                 )
                 // 处理焦点变化
                 .onFocusChanged {
-                    if (it.isFocused) {
-                        videoPlayerViewModel.atpFocus = it.isFocused
+                    if (it.hasFocus) {
+                        videoPlayerViewModel.atpFocus = it.hasFocus
 
                     } else {
                         videoPlayerState.hideControls() // 隐藏控制栏
-                        videoPlayerViewModel.atpFocus = it.isFocused
+                        videoPlayerViewModel.atpFocus = it.hasFocus
                     }
                 }) {
             // 根据 ViewModel 中的选择显示不同的面板
@@ -896,6 +917,21 @@ fun VideoPlayerScreen(
                 }
             }
 
+            is VideoPlayerStatus.ENDED -> {
+                // 老人模式：根据 stayOnPageAfterEnd 配置决定播放结束后的行为
+                if (isElderMode && elderConfig?.stayOnPageAfterEnd == false) {
+                    // 自动返回上一页
+                    LaunchedEffect(Unit) {
+                        (context as? android.app.Activity)?.finish()
+                    }
+                } else {
+                    // 停留在当前页，显示控制栏
+                    LaunchedEffect(Unit) {
+                        videoPlayerState.showControls(seconds = Int.MAX_VALUE)
+                    }
+                }
+            }
+
             else -> {}
         }
         if (isFirstLoad) {
@@ -980,47 +1016,51 @@ private fun Modifier.dPadEvents(
     player: IMzPlayer, // 这里把 ExoPlayer 换成 IMzPlayer
     videoPlayerState: VideoPlayerState,
     pulseState: VideoPlayerPulseState,
-    videoPlayerViewModel: VideoPlayerViewModel
+    videoPlayerViewModel: VideoPlayerViewModel,
+    seekStepMs: Long = 30_000L // 快进快退步进（毫秒），老人模式传 10_000L
 ): Modifier = this
-    .handleDPadKeyEvents(
-        onLeft = {
-            // 如果控制栏未显示，则快退
-            if (!videoPlayerState.controlsVisible) {
-                player.seekBack() // 调用接口方法
-                pulseState.setType(VideoPlayerPulse.Type.BACK)
-                // 👇 新增这行：触发快退时显示底部进度条
-                videoPlayerState.showControls()
-            }
-        },
-        onRight = {
-            // 如果控制栏未显示，则快进
-            if (!videoPlayerState.controlsVisible) {
-                player.seekForward() // 调用接口方法
-                pulseState.setType(VideoPlayerPulse.Type.FORWARD)
-                // 👇 新增这行：触发快退时显示底部进度条
-                videoPlayerState.showControls()
-            }
-        },
-        onUp = {
-            if (!videoPlayerState.controlsVisible) {
-                videoPlayerViewModel.atpVisibility = true
-                videoPlayerViewModel.selectedAorVorS = "A"
-            }
-        },
-        onDown = {
-            if (!videoPlayerState.controlsVisible) {
-                videoPlayerViewModel.atpVisibility = true
-                videoPlayerViewModel.selectedAorVorS = "D"
-            }
-        },
-        onEnter = {
-            // 暂停播放并显示控制栏
-            player.pause() // 调用接口方法
-            videoPlayerState.showControls()
-        },
-    )
     .onKeyEvent { keyEvent ->
-        // 这里的逻辑主要是控制 UI 显示隐藏，不涉及播放器具体实现，保持原样即可
+        // 控制栏可见时, 放行方向键和确认键给子节点(控制按钮/进度条)和 Compose 焦点遍历
+        if (videoPlayerState.controlsVisible) {
+            return@onKeyEvent false
+        }
+
+        // 控制栏不可见时处理按键
+        if (keyEvent.nativeKeyEvent.action == KeyEvent.ACTION_UP) {
+            when (keyEvent.nativeKeyEvent.keyCode) {
+                KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_SYSTEM_NAVIGATION_LEFT -> {
+                    player.seekBack(seekStepMs)
+                    pulseState.setType(VideoPlayerPulse.Type.BACK)
+                    videoPlayerState.showControls()
+                    true
+                }
+                KeyEvent.KEYCODE_DPAD_RIGHT, KeyEvent.KEYCODE_SYSTEM_NAVIGATION_RIGHT -> {
+                    player.seekForward(seekStepMs)
+                    pulseState.setType(VideoPlayerPulse.Type.FORWARD)
+                    videoPlayerState.showControls()
+                    true
+                }
+                KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_SYSTEM_NAVIGATION_UP -> {
+                    videoPlayerViewModel.atpVisibility = true
+                    videoPlayerViewModel.selectedAorVorS = "A"
+                    true
+                }
+                KeyEvent.KEYCODE_DPAD_DOWN, KeyEvent.KEYCODE_SYSTEM_NAVIGATION_DOWN -> {
+                    videoPlayerViewModel.atpVisibility = true
+                    videoPlayerViewModel.selectedAorVorS = "D"
+                    true
+                }
+                KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_NUMPAD_ENTER -> {
+                    if (player.isPlaying) player.pause() else player.play()
+                    videoPlayerState.showControls()
+                    true
+                }
+                else -> false
+            }
+        } else false
+    }
+    .onKeyEvent { keyEvent ->
+        // Menu 键处理 (控制栏可见/不可见都可触发)
         when (keyEvent.key) {
             Key.Menu, Key.ButtonY -> {
                 if (!videoPlayerState.controlsVisible && !videoPlayerViewModel.atpVisibility) {
@@ -1028,15 +1068,7 @@ private fun Modifier.dPadEvents(
                     true
                 } else false
             }
-
-            else -> {
-                if (keyEvent.nativeKeyEvent.keyCode == KeyEvent.KEYCODE_MENU) {
-                    if (!videoPlayerState.controlsVisible && !videoPlayerViewModel.atpVisibility) {
-                        videoPlayerState.showControls()
-                        true
-                    } else false
-                } else false
-            }
+            else -> false
         }
     }
 

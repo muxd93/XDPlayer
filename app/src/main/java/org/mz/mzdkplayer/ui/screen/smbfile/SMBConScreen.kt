@@ -30,6 +30,7 @@ import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -57,13 +58,13 @@ import java.util.UUID
  */
 @Composable
 
-fun SMBConScreen(smbListViewModel: SMBListViewModel = viewModel()) {
+fun SMBConScreen(smbListViewModel: SMBListViewModel = viewModel(), prefillIp: String = "") {
     val viewModel: SMBConViewModel = viewModel()
-    var ip by remember { mutableStateOf("192.168.110.31") }
-    var username by remember { mutableStateOf("wang") }
-    var password by remember { mutableStateOf("138138") }
-    var shareName by remember { mutableStateOf("/") }
-    var aliasName by remember { mutableStateOf("as") }
+    var ip by remember { mutableStateOf(prefillIp) }
+    var username by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
+    var shareName by remember { mutableStateOf("") }
+    var aliasName by remember { mutableStateOf("") }
     val keyboardController = LocalSoftwareKeyboardController.current
     // 全局跟踪当前活跃的输入框ID（初始为null）
     //val activeFieldId = remember { mutableStateOf<String?>(null) }
@@ -92,8 +93,16 @@ fun SMBConScreen(smbListViewModel: SMBListViewModel = viewModel()) {
         )
         {
             Row(verticalAlignment = Alignment.CenterVertically) {
+                val statusText = when (connectionStatus) {
+                    is FileConnectionStatus.Disconnected -> "未连接"
+                    is FileConnectionStatus.Connecting -> "连接中..."
+                    is FileConnectionStatus.Connected -> "已连接"
+                    is FileConnectionStatus.LoadingFile -> "加载文件中..."
+                    is FileConnectionStatus.FilesLoaded -> "文件已加载"
+                    is FileConnectionStatus.Error -> "错误: ${(connectionStatus as FileConnectionStatus.Error).message}"
+                }
                 Text(
-                    text = stringResource(R.string.ui_label_smb_connection_status,connectionStatus.toString()),
+                    text = statusText,
                     color = Color.White,
                     style = MaterialTheme.typography.titleMedium,
                     modifier = Modifier.widthIn(100.dp, 400.dp),
@@ -138,8 +147,8 @@ fun SMBConScreen(smbListViewModel: SMBListViewModel = viewModel()) {
                 modifier = Modifier.fillMaxWidth(1f),
                 colors = myTTFColor(),
                 placeholder = stringResource(R.string.ui_label_password),
-
                 textStyle = TextStyle(color = Color.White),
+                visualTransformation = PasswordVisualTransformation(),
             )
 
             TvTextField(
@@ -202,6 +211,13 @@ fun SMBConScreen(smbListViewModel: SMBListViewModel = viewModel()) {
                             )
                         ) {
                             Toast.makeText(context, context.getString(R.string.ui_label_added_successfully), Toast.LENGTH_SHORT).show()
+                            // 保存成功后清空表单
+                            ip = ""
+                            username = ""
+                            password = ""
+                            shareName = ""
+                            aliasName = ""
+                            viewModel.disconnectSMB()
                         } else {
                             Toast.makeText(
                                 context,

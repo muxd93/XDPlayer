@@ -8,11 +8,12 @@ import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.edit
+import java.security.MessageDigest
 
 // 定义一个单例或者通过 Hilt 注入，这里用简单的单例模式
 object SettingsRepository {
     private const val PREF_NAME = "app_settings"
-    private lateinit var prefs: SharedPreferences
+    internal lateinit var prefs: SharedPreferences
 
     fun init(context: Context) {
         prefs = context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
@@ -51,8 +52,17 @@ object SettingsRepository {
     // 🔥 新增：优先选择本地 nfo
     private const val KEY_PRIORITIZE_LOCAL_NFO = "prioritize_local_nfo"
 
+    // --- 适老化模式 Keys ---
+    private const val KEY_APP_MODE = "app_mode"
+    private const val KEY_MODE_PIN = "mode_pin"
+    private const val KEY_WEB_CONFIG_ENABLED = "web_config_enabled"
+
     // 🔥 新增：Exo音频解码模式 (0=纯硬解, 1=硬解优先, 2=软解优先)
     private const val KEY_EXO_AUDIO_DECODE_MODE = "exo_audio_decode_mode"
+
+    // ExoPlayer 下载缓存大小 (MB)，默认 5GB
+    // 注意：缓存大小在 Application.onCreate 中一次性创建 SimpleCache，修改后需重启应用生效
+    private const val KEY_EXO_CACHE_SIZE_MB = "exo_cache_size_mb"
     // --- Getters & Setters ---
 
     // 常规
@@ -84,6 +94,11 @@ object SettingsRepository {
     var exoAudioDecodeMode: Int
         get() = prefs.getInt(KEY_EXO_AUDIO_DECODE_MODE, 1) // 默认 1 (硬解优先)
         set(value) = prefs.edit { putInt(KEY_EXO_AUDIO_DECODE_MODE, value) }
+
+    // ExoPlayer 缓存大小 (MB)，默认 5120 = 5GB
+    var exoCacheSizeMb: Int
+        get() = prefs.getInt(KEY_EXO_CACHE_SIZE_MB, 5120)
+        set(value) = prefs.edit { putInt(KEY_EXO_CACHE_SIZE_MB, value) }
     // 字幕外观
     var subtitleFontSize: Float
         get() = prefs.getFloat(KEY_SUB_SIZE, 22f)
@@ -154,4 +169,31 @@ object SettingsRepository {
     var prioritizeLocalNfo: Boolean
         get() = prefs.getBoolean(KEY_PRIORITIZE_LOCAL_NFO, false)
         set(value) = prefs.edit { putBoolean(KEY_PRIORITIZE_LOCAL_NFO, value) }
+
+    // 适老化模式
+    var appMode: String
+        get() = prefs.getString(KEY_APP_MODE, "elder") ?: "elder"
+        set(value) = prefs.edit { putString(KEY_APP_MODE, value) }
+
+    var modePin: String
+        get() = prefs.getString(KEY_MODE_PIN, "") ?: ""
+        set(value) = prefs.edit { putString(KEY_MODE_PIN, hashPin(value)) }
+
+    /** 验证 PIN 是否匹配 (PIN 以 SHA-256 哈希形式存储) */
+    fun verifyPin(pin: String): Boolean {
+        val stored = modePin
+        if (stored.isEmpty()) return false
+        return stored == hashPin(pin)
+    }
+
+    /** 对 PIN 做 SHA-256 哈希, 返回十六进制字符串 */
+    private fun hashPin(pin: String): String {
+        if (pin.isEmpty()) return ""
+        val digest = MessageDigest.getInstance("SHA-256")
+        return digest.digest(pin.toByteArray()).joinToString("") { "%02x".format(it) }
+    }
+
+    var webConfigEnabled: Boolean
+        get() = prefs.getBoolean(KEY_WEB_CONFIG_ENABLED, true)
+        set(value) = prefs.edit { putBoolean(KEY_WEB_CONFIG_ENABLED, value) }
 }

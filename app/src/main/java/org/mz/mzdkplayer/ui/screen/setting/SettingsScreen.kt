@@ -43,6 +43,7 @@ import org.mz.mzdkplayer.tool.viewModelWithFactory
 import org.mz.mzdkplayer.ui.screen.common.DeleteConfirmDialog
 import org.mz.mzdkplayer.ui.screen.common.FilePermissionScreen
 import org.mz.mzdkplayer.ui.screen.common.MyIconButton
+import org.mz.mzdkplayer.ui.screen.common.WebConfigDialog
 import org.mz.mzdkplayer.ui.screen.vm.AudioViewModel
 import org.mz.mzdkplayer.ui.screen.vm.MovieViewModel
 import org.mz.mzdkplayer.ui.screen.vm.SettingsUiState
@@ -164,7 +165,7 @@ fun SettingsScreen(
                 // 根据分类加载具体内容
                 when (selectedCategory) {
                     SettingCategory.General -> item {
-                        GeneralSection(state, settingsVM, context = context)
+                        GeneralSection(state, settingsVM, context = context, navController = mainNavController)
                     }
 
                     SettingCategory.Playback -> item {
@@ -221,7 +222,14 @@ fun CategoryItem(
 // --- 以下为拆分后的右侧具体设置内容块 ---
 
 @Composable
-fun GeneralSection(state: SettingsUiState, settingsVM: SettingsViewModel,context: Context) {
+fun GeneralSection(
+    state: SettingsUiState,
+    settingsVM: SettingsViewModel,
+    context: Context,
+    navController: NavHostController
+) {
+    var showElderModeDialog by remember { mutableStateOf(false) }
+
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         SwitchSettingItem(
             title = stringResource(R.string.setting_hide_details),
@@ -246,6 +254,76 @@ fun GeneralSection(state: SettingsUiState, settingsVM: SettingsViewModel,context
                     else -> ""
                 }
                 settingsVM.setAppLanguage(context,next)
+            }
+        )
+        // 老人模式开关
+        SwitchSettingItem(
+            title = stringResource(R.string.setting_elder_mode),
+            subtitle = stringResource(R.string.setting_elder_mode_sub),
+            checked = state.isElderMode,
+            onCheckedChange = { showElderModeDialog = true }
+        )
+        // 老人模式 TV 端配置（仅在老人模式相关时显示）
+        ActionSettingItem(
+            title = stringResource(R.string.setting_elder_slot_count),
+            value = state.elderSlotCount.toString(),
+            subtitle = stringResource(R.string.setting_elder_slot_count_sub),
+            onClick = {
+                val opts = listOf(4, 6, 8, 12, 16)
+                val idx = opts.indexOf(state.elderSlotCount)
+                val next = opts[(idx + 1) % opts.size]
+                settingsVM.setElderSlotCount(next)
+            }
+        )
+        SwitchSettingItem(
+            title = stringResource(R.string.setting_elder_show_recent),
+            checked = state.elderShowRecent,
+            onCheckedChange = { settingsVM.toggleElderShowRecent(it) }
+        )
+        SwitchSettingItem(
+            title = stringResource(R.string.setting_elder_auto_resume),
+            subtitle = stringResource(R.string.setting_elder_auto_resume_sub),
+            checked = state.elderAutoResume,
+            onCheckedChange = { settingsVM.toggleElderAutoResume(it) }
+        )
+        SwitchSettingItem(
+            title = stringResource(R.string.setting_elder_stay_on_page),
+            subtitle = stringResource(R.string.setting_elder_stay_on_page_sub),
+            checked = state.elderStayOnPageAfterEnd,
+            onCheckedChange = { settingsVM.toggleElderStayOnPageAfterEnd(it) }
+        )
+        // Web 配置入口
+        var showWebConfigDialog by remember { mutableStateOf(false) }
+        ActionSettingItem(
+            title = "Web 配置",
+            value = if (state.webConfigEnabled) "已启用" else "已禁用",
+            subtitle = "通过手机扫码远程配置 TV",
+            onClick = { showWebConfigDialog = true }
+        )
+        if (showWebConfigDialog) {
+            WebConfigDialog(
+                enabled = state.webConfigEnabled,
+                onToggle = { settingsVM.toggleWebConfig(it) },
+                onDismiss = { showWebConfigDialog = false }
+            )
+        }
+    }
+
+    if (showElderModeDialog) {
+        DeleteConfirmDialog(
+            title = stringResource(R.string.setting_elder_mode_confirm_title),
+            message = stringResource(R.string.setting_elder_mode_confirm_msg),
+            onConfirm = {
+                showElderModeDialog = false
+                settingsVM.switchToElderMode()
+                navController.navigate("ElderHomePage") {
+                    popUpTo(navController.graph.startDestinationId) {
+                        inclusive = true
+                    }
+                }
+            },
+            onDismiss = {
+                showElderModeDialog = false
             }
         )
     }
@@ -289,6 +367,18 @@ fun PlaybackSection(state: SettingsUiState, settingsVM: SettingsViewModel) {
             subtitle = stringResource(R.string.setting_tunneling_sub),
             checked = state.enableTunneling,
             onCheckedChange = { settingsVM.toggleTunneling(it) }
+        )
+        // ExoPlayer 缓存大小
+        ActionSettingItem(
+            title = "ExoPlayer缓存大小",
+            value = formatCacheSize(state.exoCacheSizeMb),
+            subtitle = "重启应用后生效",
+            onClick = {
+                val opts = listOf(1024, 2048, 3072, 5120, 10240)
+                val idx = opts.indexOf(state.exoCacheSizeMb)
+                val next = opts[(idx + 1) % opts.size]
+                settingsVM.setExoCacheSizeMb(next)
+            }
         )
     }
 }
@@ -511,6 +601,7 @@ fun SwitchSettingItem(
 fun ActionSettingItem(
     title: String,
     value: String,
+    subtitle: String? = null,
     onClick: () -> Unit
 ) {
     ListItem(
@@ -518,6 +609,9 @@ fun ActionSettingItem(
         onClick = onClick,
         headlineContent = { Text(title) },
         colors = myListItemCoverColor(),
+        supportingContent = if (subtitle != null) {
+            { Text(subtitle) }
+        } else null,
         trailingContent = {
             Text(text = value, style = MaterialTheme.typography.bodyMedium)
         },
@@ -653,4 +747,10 @@ fun formatAudioDecodeMode(mode: Int): String = when (mode) {
     1 -> stringResource(R.string.setting_audio_decode_hw_priority)
     2 -> stringResource(R.string.setting_audio_decode_sw_priority)
     else -> stringResource(R.string.ui_label_unknown)
+}
+
+@Composable
+fun formatCacheSize(sizeMb: Int): String {
+    val gb = sizeMb / 1024
+    return if (gb >= 1) "${gb} GB" else "${sizeMb} MB"
 }

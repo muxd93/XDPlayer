@@ -57,6 +57,9 @@ fun VideoPlayerOverlay(
     LaunchedEffect(state.controlsVisible) {
         if (state.controlsVisible) {
             focusRequester.requestFocus()
+        } else {
+            // 控制栏隐藏时释放焦点, 避免焦点停留在不可见控件上
+            focusRequester.freeFocus()
         }
     }
 

@@ -7,11 +7,13 @@ import androidx.room.RoomDatabase
 import androidx.room.migration.Migration // 👈 记得导入
 import androidx.sqlite.db.SupportSQLiteDatabase // 👈 记得导入
 
-@Database(entities = [MediaCacheEntity::class,MediaHistoryEntity::class,AudioCacheEntity::class ], version = 8, exportSchema = false)
+@Database(entities = [MediaCacheEntity::class,MediaHistoryEntity::class,AudioCacheEntity::class,HomeSlotEntity::class,FolderVideoEntity::class], version = 9, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun mediaDao(): MediaDao
     abstract fun mediaHistoryDao(): MediaHistoryDao // 新增
     abstract fun audioDao(): AudioDao //  3. 新增 AudioDao 访问接口
+    abstract fun homeSlotDao(): HomeSlotDao
+    abstract fun folderVideoDao(): FolderVideoDao
     companion object {
         @Volatile
         private var INSTANCE: AppDatabase? = null
@@ -124,6 +126,43 @@ abstract class AppDatabase : RoomDatabase() {
                 db.execSQL("CREATE INDEX IF NOT EXISTS `index_audio_cache_dateAdded` ON `audio_cache` (`dateAdded`)")
             }
         }
+        // 新增：V8 到 V9 的迁移，创建 home_slots 和 folder_videos 表
+        val MIGRATION_8_9: Migration = object : Migration(8, 9) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS `home_slots` (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `sortOrder` INTEGER NOT NULL,
+                        `slotType` TEXT NOT NULL,
+                        `label` TEXT NOT NULL DEFAULT '',
+                        `folderUri` TEXT,
+                        `folderDataSourceType` TEXT,
+                        `folderConnectionName` TEXT,
+                        `customThumbnailPath` TEXT,
+                        `videoUri` TEXT,
+                        `videoDataSourceType` TEXT,
+                        `videoConnectionName` TEXT,
+                        `videoFileName` TEXT,
+                        `appPackageName` TEXT
+                    )
+                """.trimIndent())
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS `folder_videos` (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `folderSlotId` INTEGER NOT NULL,
+                        `sortOrder` INTEGER NOT NULL,
+                        `videoUri` TEXT NOT NULL,
+                        `dataSourceType` TEXT NOT NULL,
+                        `fileName` TEXT NOT NULL,
+                        `connectionName` TEXT NOT NULL,
+                        `thumbnailPath` TEXT,
+                        `lastScannedAt` INTEGER NOT NULL DEFAULT 0,
+                        FOREIGN KEY(`folderSlotId`) REFERENCES `home_slots`(`id`) ON DELETE CASCADE
+                    )
+                """.trimIndent())
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_folder_videos_folderSlotId` ON `folder_videos` (`folderSlotId`)")
+            }
+        }
         fun getDatabase(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -131,7 +170,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "mzdk_player_database"
                 )
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3,MIGRATION_3_4,MIGRATION_4_5,MIGRATION_5_6,MIGRATION_6_7,MIGRATION_7_8) // 添加迁移
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3,MIGRATION_3_4,MIGRATION_4_5,MIGRATION_5_6,MIGRATION_6_7,MIGRATION_7_8,MIGRATION_8_9) // 添加迁移
                     .build()
                 INSTANCE = instance
                 instance

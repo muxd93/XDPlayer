@@ -43,6 +43,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import androidx.navigation.navOptions
 import androidx.tv.material3.DrawerState
 import androidx.tv.material3.DrawerValue
@@ -110,6 +111,13 @@ import org.mz.mzdkplayer.ui.screen.vm.SettingsViewModel
 import org.mz.mzdkplayer.ui.screen.vm.WebDavListViewModel
 import org.mz.mzdkplayer.ui.theme.mySideListItemColor
 
+import org.mz.mzdkplayer.data.repository.SettingsRepository
+import org.mz.mzdkplayer.data.repository.ModeManager
+import org.mz.mzdkplayer.ui.elder.ElderHomeScreen
+import org.mz.mzdkplayer.ui.elder.ElderFolderScreen
+import org.mz.mzdkplayer.ui.elder.ElderAppListScreen
+import org.mz.mzdkplayer.ui.elder.ElderLocalFilePickerScreen
+import org.mz.mzdkplayer.ui.elder.ElderSmbPickerScreen
 import org.mz.mzdkplayer.ui.videoplayer.VideoPlayerScreen
 import java.net.URLDecoder
 import java.net.URLEncoder
@@ -172,10 +180,31 @@ fun MzDKPlayerAPP(externalVideoUri: Uri?) {
     val settingsState by settingsVM.uiState.collectAsState()
     NavHost(
         navController = mainNavController,
-        startDestination = "MainPage",
+        startDestination = if (ModeManager.isElderMode) "ElderHomePage" else "MainPage",
         modifier = Modifier.background(Color.Black)
     )
     {
+
+        composable("ElderHomePage") {
+            ElderHomeScreen(mainNavController)
+        }
+        composable("ElderAppListPage") {
+            ElderAppListScreen(mainNavController)
+        }
+        composable("ElderFolderPage/{slotId}") { backStackEntry ->
+            val slotId = backStackEntry.arguments?.getString("slotId")?.toIntOrNull() ?: 0
+            ElderFolderScreen(slotId, mainNavController)
+        }
+        composable("ElderLocalFilePicker/{slotId}/{slotType}") { backStackEntry ->
+            val slotId = backStackEntry.arguments?.getString("slotId")?.toIntOrNull() ?: 0
+            val slotType = backStackEntry.arguments?.getString("slotType") ?: "folder"
+            ElderLocalFilePickerScreen(slotId, slotType, mainNavController)
+        }
+        composable("ElderSmbPicker/{slotId}/{slotType}") { backStackEntry ->
+            val slotId = backStackEntry.arguments?.getString("slotId")?.toIntOrNull() ?: 0
+            val slotType = backStackEntry.arguments?.getString("slotType") ?: "folder"
+            ElderSmbPickerScreen(slotId, slotType, mainNavController)
+        }
 
         composable("MainPage") {
             val homeNavController = rememberNavController()
@@ -408,7 +437,8 @@ fun MzDKPlayerAPP(externalVideoUri: Uri?) {
                     connectionName,
                     mediaHistoryViewModel,
                     shouldUseVlc,
-                    settingsVM
+                    settingsVM,
+                    onBack = { mainNavController.popBackStack() }
                 )
             }
         }
@@ -621,8 +651,12 @@ fun MzDKPlayerAPP(externalVideoUri: Uri?) {
         composable("SMBListScreen") {
             SMBConListScreen(mainNavController, smbListViewModel)
         }
-        composable("SMBConScreen") {
-            SMBConScreen(smbListViewModel)
+        composable(
+            "SMBConScreen?ip={ip}",
+            arguments = listOf(navArgument("ip") { defaultValue = "" })
+        ) { backStackEntry ->
+            val prefillIp = backStackEntry.arguments?.getString("ip") ?: ""
+            SMBConScreen(smbListViewModel, prefillIp)
         }
         composable("WebDavConScreen") {
             WebDavConScreen(webDavListViewModel)

@@ -5,6 +5,8 @@ import androidx.lifecycle.ViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import org.mz.mzdkplayer.data.repository.ElderModeConfig
+import org.mz.mzdkplayer.data.repository.ModeManager
 import org.mz.mzdkplayer.data.repository.SettingsRepository
 import org.mz.mzdkplayer.tool.LanguageManager
 
@@ -17,6 +19,7 @@ data class SettingsUiState(
     val enableTunneling: Boolean = false,
     val enablePassthrough: Boolean = false,
     val exoAudioDecodeMode: Int = 1, // 新增：音频解码模式
+    val exoCacheSizeMb: Int = 5120, // ExoPlayer 缓存大小 (MB)
     val subFontSize: Float = 22f,
     val subColor: Long = 0xFFFFFFFF,
     val subBgColor: Long = 0x80000000,
@@ -31,7 +34,14 @@ data class SettingsUiState(
     val local: Boolean = false,
     val http: Boolean = false,
     val appLang: String = "",
-    val prioritizeLocalNfo: Boolean = false
+    val prioritizeLocalNfo: Boolean = false,
+    val isElderMode: Boolean = false,
+    // 老人模式 TV 端可配置参数
+    val elderSlotCount: Int = 8,
+    val elderShowRecent: Boolean = true,
+    val elderAutoResume: Boolean = true,
+    val elderStayOnPageAfterEnd: Boolean = true,
+    val webConfigEnabled: Boolean = true
 )
 
 class SettingsViewModel : ViewModel() {
@@ -44,6 +54,7 @@ class SettingsViewModel : ViewModel() {
     }
 
     private fun refreshState() {
+        val elderConfig = ElderModeConfig.load()
         _uiState.update {
             SettingsUiState(
                 hideDetails = repo.hideDetails,
@@ -53,6 +64,7 @@ class SettingsViewModel : ViewModel() {
                 enableTunneling = repo.enableTunneling,
                 enablePassthrough = repo.enablePassthrough,
                 exoAudioDecodeMode = repo.exoAudioDecodeMode, // 新增这一行
+                exoCacheSizeMb = repo.exoCacheSizeMb,
                 subFontSize = repo.subtitleFontSize,
                 subColor = repo.subtitleColorHex,
                 subBgColor = repo.subtitleBgColorHex,
@@ -66,7 +78,13 @@ class SettingsViewModel : ViewModel() {
                 local = repo.enableLocal,
                 http = repo.enableHttp,
                 appLang = repo.appLanguage,
-                prioritizeLocalNfo = repo.prioritizeLocalNfo
+                prioritizeLocalNfo = repo.prioritizeLocalNfo,
+                isElderMode = ModeManager.isElderMode,
+                elderSlotCount = elderConfig.slotCount,
+                elderShowRecent = elderConfig.showRecent,
+                elderAutoResume = elderConfig.autoResume,
+                elderStayOnPageAfterEnd = elderConfig.stayOnPageAfterEnd,
+                webConfigEnabled = repo.webConfigEnabled
             )
         }
     }
@@ -111,6 +129,42 @@ class SettingsViewModel : ViewModel() {
     }
     fun togglePrioritizeLocalNfo(v: Boolean) {
         repo.prioritizeLocalNfo = v
+        refreshState()
+    }
+
+    fun setExoCacheSizeMb(sizeMb: Int) {
+        repo.exoCacheSizeMb = sizeMb
+        refreshState()
+    }
+
+    fun switchToElderMode() {
+        ModeManager.switchToElderMode()
+        refreshState()
+    }
+
+    // ---- 老人模式 TV 端配置 ----
+    fun setElderSlotCount(count: Int) {
+        ElderModeConfig.update { copy(slotCount = count) }
+        refreshState()
+    }
+
+    fun toggleElderShowRecent(v: Boolean) {
+        ElderModeConfig.update { copy(showRecent = v) }
+        refreshState()
+    }
+
+    fun toggleElderAutoResume(v: Boolean) {
+        ElderModeConfig.update { copy(autoResume = v) }
+        refreshState()
+    }
+
+    fun toggleElderStayOnPageAfterEnd(v: Boolean) {
+        ElderModeConfig.update { copy(stayOnPageAfterEnd = v) }
+        refreshState()
+    }
+
+    fun toggleWebConfig(v: Boolean) {
+        repo.webConfigEnabled = v
         refreshState()
     }
 }

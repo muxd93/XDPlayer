@@ -7,6 +7,7 @@ import android.widget.Toast
 import androidx.annotation.OptIn
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -18,6 +19,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -42,6 +44,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -70,8 +73,6 @@ import org.mz.mzdkplayer.ui.screen.common.FileEmptyScreen
 import org.mz.mzdkplayer.ui.screen.common.FileIcon
 import org.mz.mzdkplayer.ui.screen.common.FileName
 import org.mz.mzdkplayer.ui.screen.common.FileSize
-import org.mz.mzdkplayer.ui.screen.common.ISODialog
-
 import org.mz.mzdkplayer.ui.screen.common.LoadingScreen
 import org.mz.mzdkplayer.ui.screen.common.MediaFocusedFileName
 import org.mz.mzdkplayer.ui.screen.common.MediaInfoLoading
@@ -81,6 +82,7 @@ import org.mz.mzdkplayer.ui.screen.common.MediaTitle
 import org.mz.mzdkplayer.ui.screen.common.MyFileDialog
 import org.mz.mzdkplayer.ui.screen.common.VAErrorScreen
 import org.mz.mzdkplayer.ui.screen.vm.SMBConViewModel
+import org.mz.mzdkplayer.ui.screen.vm.SMBFileItem
 
 import org.mz.mzdkplayer.ui.theme.myTTFColor
 import org.mz.mzdkplayer.ui.theme.MyFileListItemColor
@@ -126,20 +128,24 @@ fun SMBFileListScreen(
     val isAudioScanning by audioViewModel.isScanning.collectAsState()
     var seaText by remember { mutableStateOf("") }
     var mediaId by remember { mutableIntStateOf(-1) }
-    var showISODialog by remember { mutableStateOf(false) }
-    var isoTitles by remember { mutableStateOf<List<String>>(emptyList()) }
-    var currentISOUri by remember { mutableStateOf("") }
-    var currentISOFileName by remember { mutableStateOf<String?>(null) }
+    // 排序模式：0=按名称, 1=按大小
+    var sortMode by remember { mutableIntStateOf(0) }
     //  新增：过滤后的文件列表
-    val filteredFiles by remember(files, seaText) {
+    val filteredFiles by remember(files, seaText, sortMode) {
         derivedStateOf {
-            if (seaText.isBlank()) {
+            val filtered = if (seaText.isBlank()) {
                 files
             } else {
                 files.filter { file ->
                     file.name.contains(seaText, ignoreCase = true)
                 }
             }
+            // 目录始终排在前面，然后按排序模式排列
+            filtered.sortedWith(
+                compareBy<SMBFileItem> { !it.isDirectory }
+                    .thenBy { if (sortMode == 0) it.name.lowercase() else "" }
+                    .thenByDescending { if (sortMode == 1) it.fileSize else 0L }
+            )
         }
     }
     // 控制弹窗显示
@@ -227,12 +233,11 @@ fun SMBFileListScreen(
         }
     }
 
-    // 清理资源
+    // 清理资源（连接断开由 ViewModel.onCleared 接管，避免配置变更时误断连）
     DisposableEffect(Unit) {
         onDispose {
-            Log.d("SMBFileListScreen", "界面销毁，释放资源")
+            Log.d("SMBFileListScreen", "界面销毁，释放播放器资源")
             exoPlayer?.release()
-            viewModel.disconnectSMB()
         }
     }
 
@@ -262,6 +267,65 @@ fun SMBFileListScreen(
                                 .weight(0.7f),
                         )
                         {
+                            // 路径栏：显示当前路径 + 返回上级按钮
+                            // path 已在路由层 fromBase64 解码，直接使用
+                            val decodedPathForDisplay = path ?: ""
+                            val smbConfigForDisplay = remember(decodedPathForDisplay) {
+                                viewModel.parseSMBPath(decodedPathForDisplay)
+                            }
+                            val canGoUp = smbConfigForDisplay.path != "/" && smbConfigForDisplay.path.isNotEmpty()
+                            val pathDisplay = if (smbConfigForDisplay.path == "/" || smbConfigForDisplay.path.isEmpty()) {
+                                smbConfigForDisplay.share
+                            } else {
+                                "${smbConfigForDisplay.share}${smbConfigForDisplay.path}"
+                            }
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 10.dp, vertical = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                if (canGoUp) {
+                                    Text(
+                                        text = "↑ 返回上级",
+                                        color = Color(0xFF888888),
+                                        fontSize = 14.sp,
+                                        modifier = Modifier.clickable {
+                                            val parentPath = smbConfigForDisplay.path
+                                                .substringBeforeLast("/", "")
+                                                .let { if (it.isEmpty()) "/" else it }
+                                            val parentUri = viewModel.buildSMBPath(
+                                                smbConfigForDisplay.server,
+                                                smbConfigForDisplay.share,
+                                                parentPath,
+                                                smbConfigForDisplay.username,
+                                                smbConfigForDisplay.password
+                                            )
+                                            val encodedParentUri = parentUri.toBase64()
+                                            val encodedConnectionName = connectionName.toBase64()
+                                            navController.navigate("SMBFileListScreen/$encodedParentUri/$encodedConnectionName")
+                                        }
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                }
+                                Text(
+                                    text = pathDisplay,
+                                    color = Color(0xFF999999),
+                                    fontSize = 14.sp,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.weight(1f)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = if (sortMode == 0) "排序: 名称" else "排序: 大小",
+                                    color = Color(0xFF888888),
+                                    fontSize = 14.sp,
+                                    modifier = Modifier.clickable {
+                                        sortMode = if (sortMode == 0) 1 else 0
+                                    }
+                                )
+                            }
 
                             LazyColumn(
                                 modifier = Modifier
@@ -316,8 +380,7 @@ fun SMBFileListScreen(
                                                         }
 
                                                         Tools.containsVideoFormat(fileExtension) -> {
-
-                                                            // 处理视频文件点击
+                                                            // 处理视频文件点击（含 ISO，VLC 原生支持 ISO 播放）
                                                             Log.d(
                                                                 "SMBFileListScreen",
                                                                 "connectionName:$connectionName"
@@ -649,7 +712,19 @@ fun SMBFileListScreen(
             }
         }
     }
-
+    if (showEditDialog) {
+        MyFileDialog(
+            onDismiss = { showEditDialog = false },
+            fileName = focusedFileName,
+            onEditClick = {
+                showEditDialog = false
+                navController.navigate(
+                    "EditTMDBInfoScreen/${focusedMediaUri.toBase64()}"
+                )
+            },
+            onCloseClick = { showEditDialog = false }
+        )
+    }
 }
 
 
