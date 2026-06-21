@@ -84,31 +84,31 @@ fun Modifier.handleDPadKeyEvents(
     onEnter: (() -> Unit)? = null ,
     onBack: (() -> Unit)? = null
 ) = onKeyEvent {
+    if (it.nativeKeyEvent.action != KeyEvent.ACTION_UP) return@onKeyEvent false
 
-    if (it.nativeKeyEvent.action == KeyEvent.ACTION_UP) {
-        when (it.nativeKeyEvent.keyCode) {
-            KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_SYSTEM_NAVIGATION_LEFT -> {
-                onLeft?.invoke().also { return@onKeyEvent true }
-            }
-
-            KeyEvent.KEYCODE_DPAD_RIGHT, KeyEvent.KEYCODE_SYSTEM_NAVIGATION_RIGHT -> {
-                onRight?.invoke().also { return@onKeyEvent true }
-            }
-
-            KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_SYSTEM_NAVIGATION_UP -> {
-                onUp?.invoke().also { return@onKeyEvent true }
-            }
-
-            KeyEvent.KEYCODE_DPAD_DOWN, KeyEvent.KEYCODE_SYSTEM_NAVIGATION_DOWN -> {
-                onDown?.invoke().also { return@onKeyEvent true }
-            }
-
-            KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_NUMPAD_ENTER -> {
-                onEnter?.invoke().also { return@onKeyEvent true }
-            }
+    when (it.nativeKeyEvent.keyCode) {
+        KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_SYSTEM_NAVIGATION_LEFT -> {
+            if (onLeft != null) { onLeft(); true } else false
         }
+
+        KeyEvent.KEYCODE_DPAD_RIGHT, KeyEvent.KEYCODE_SYSTEM_NAVIGATION_RIGHT -> {
+            if (onRight != null) { onRight(); true } else false
+        }
+
+        KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_SYSTEM_NAVIGATION_UP -> {
+            if (onUp != null) { onUp(); true } else false
+        }
+
+        KeyEvent.KEYCODE_DPAD_DOWN, KeyEvent.KEYCODE_SYSTEM_NAVIGATION_DOWN -> {
+            if (onDown != null) { onDown(); true } else false
+        }
+
+        KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_NUMPAD_ENTER -> {
+            if (onEnter != null) { onEnter(); true } else false
+        }
+
+        else -> false
     }
-    false
 }
 
 /**

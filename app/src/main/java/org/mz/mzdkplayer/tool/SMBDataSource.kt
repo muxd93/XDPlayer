@@ -54,19 +54,19 @@ class SmbDataSource(
          */
         fun releaseGlobalResources() {
             Log.i(TAG, "Releasing GLOBAL SMB resources...")
-            try {
-                cachedShare = null
-                cachedSession = null
-                cachedConnection = null
-                currentHost = null
-                sharedSmbClient = null
-            } catch (e: Exception) {
-                Log.w(TAG, "Error releasing global resources", e)
-            } finally {
-
-                // sharedSmbClient 通常可以保留复用，如果需要彻底重置可解开下面注释
-
-            }
+            try { cachedShare?.close() } catch (e: Exception) {
+                Log.w(TAG, "Error closing share", e)
+            } finally { cachedShare = null }
+            try { cachedSession?.close() } catch (e: Exception) {
+                Log.w(TAG, "Error closing session", e)
+            } finally { cachedSession = null }
+            try { cachedConnection?.close() } catch (e: Exception) {
+                Log.w(TAG, "Error closing connection", e)
+            } finally { cachedConnection = null }
+            try { sharedSmbClient?.close() } catch (e: Exception) {
+                Log.w(TAG, "Error closing client", e)
+            } finally { sharedSmbClient = null }
+            currentHost = null
             Log.i(TAG, "Releasing GLOBAL SMB END...")
         }
     }
@@ -258,7 +258,8 @@ class SmbDataSource(
     private fun parseUserInfo(uri: Uri): Pair<String, String> {
         val userInfo = uri.userInfo
         if (userInfo.isNullOrEmpty()) return Pair("guest", "")
-        val parts = userInfo.split(":")
+        // 密码可能含 :, 用 limit=2 只切第一个冒号
+        val parts = userInfo.split(":", limit = 2)
         return if (parts.size == 2) Pair(parts[0], parts[1]) else Pair(parts[0], "")
     }
 

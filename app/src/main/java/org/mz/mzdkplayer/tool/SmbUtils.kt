@@ -9,6 +9,7 @@ import com.emc.ecs.nfsclient.nfs.io.Nfs3File
 import com.emc.ecs.nfsclient.nfs.nfs3.Nfs3
 import com.emc.ecs.nfsclient.rpc.CredentialUnix
 import com.hierynomus.msdtyp.AccessMask
+import com.hierynomus.msfscc.FileAttributes
 import com.hierynomus.mssmb2.SMB2CreateDisposition
 import com.hierynomus.mssmb2.SMB2ShareAccess
 import com.hierynomus.smbj.SMBClient
@@ -35,7 +36,67 @@ import com.hierynomus.smbj.share.File
 import okhttp3.Request
 import okhttp3.Response
 
+/**
+ * SMB 路径解析结果
+ */
+data class SmbPathInfo(
+    val server: String,
+    val share: String,
+    val path: String,
+    val username: String,
+    val password: String
+)
+
 object SmbUtils {
+
+    /**
+     * 解析 SMB URI 为结构化信息
+     * 支持格式: smb://username:password@server/share/path/to/directory
+     * 注意: 密码可能含 @ 或 :, 用最后一个 @ 分割 userInfo 与 host, 用第一个 : 分割用户名和密码
+     */
+    fun parseSMBPath(path: String): SmbPathInfo {
+        if (!path.startsWith("smb://")) return SmbPathInfo("", "", "", "", "")
+        val afterScheme = path.removePrefix("smb://")
+
+        val lastAtIndex = afterScheme.lastIndexOf('@')
+        val (userInfo, hostAndPath) = if (lastAtIndex >= 0) {
+            afterScheme.substring(0, lastAtIndex) to afterScheme.substring(lastAtIndex + 1)
+        } else {
+            "" to afterScheme
+        }
+
+        // userInfo 格式: username:password（密码可能含 :, 用 indexOf 只切第一个）
+        val (username, password) = if (userInfo.isNotEmpty()) {
+            val colonIndex = userInfo.indexOf(':')
+            if (colonIndex >= 0) {
+                userInfo.substring(0, colonIndex) to userInfo.substring(colonIndex + 1)
+            } else {
+                userInfo to ""
+            }
+        } else {
+            "guest" to ""
+        }
+
+        // host/share/path（path 可能含 /, 用 limit=3 保留剩余部分）
+        val pathParts = hostAndPath.split("/", limit = 3)
+        val server = pathParts.getOrNull(0) ?: ""
+        val share = pathParts.getOrNull(1) ?: ""
+        val rawPath = pathParts.getOrNull(2)
+        val cleanPath = when {
+            rawPath.isNullOrBlank() -> "/"
+            rawPath.startsWith("/") -> rawPath
+            else -> "/$rawPath"
+        }
+
+        return SmbPathInfo(
+            server = server,
+            share = share,
+            path = cleanPath,
+            username = username.ifEmpty { "guest" },
+            password = password
+        )
+    }
+
 
     /**
      * 根据完整的 SMB URI 打开文件并返回 InputStream
@@ -57,8 +118,10 @@ object SmbUtils {
 
             // 从 URI 获取用户凭证（注意：明文密码不安全，仅用于演示）
             val userInfo = smbUri.userInfo
-            val username = userInfo?.split(":")?.getOrNull(0) ?: "guest"
-            val password = userInfo?.split(":")?.getOrNull(1) ?: ""
+            // 密码可能含 :, 用 limit=2 只切第一个冒号
+            val credParts = userInfo?.split(":", limit = 2)
+            val username = credParts?.getOrNull(0) ?: "guest"
+            val password = credParts?.getOrNull(1) ?: ""
             val domain = "" // 可根据需要扩展
 
             val client = SMBClient()
@@ -81,15 +144,60 @@ object SmbUtils {
                     SMB2CreateDisposition.FILE_OPEN,
                     null
                 )
+                val rawInputStream = file.inputStream
+                val cascadingInputStream = object : InputStream() {
+                    private var isClosed = false
+                    private val delegateStream = rawInputStream
+
+                    override fun read(): Int {
+                        check(!isClosed) { "Stream is closed" }
+                        return delegateStream.read()
+                    }
+
+                    override fun read(b: ByteArray): Int {
+                        check(!isClosed) { "Stream is closed" }
+                        return delegateStream.read(b)
+                    }
+
+                    override fun read(b: ByteArray, off: Int, len: Int): Int {
+                        check(!isClosed) { "Stream is closed" }
+                        return delegateStream.read(b, off, len)
+                    }
+
+                    override fun available(): Int {
+                        check(!isClosed) { "Stream is closed" }
+                        return delegateStream.available()
+                    }
+
+                    override fun close() {
+                        if (isClosed) return
+                        isClosed = true
+                        try {
+                            delegateStream.close()
+                        } finally {
+                            try { file?.close() } finally {
+                                try { share?.close() } finally {
+                                    try { session?.close() } finally {
+                                        connection?.close()
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    override fun markSupported(): Boolean = delegateStream.markSupported()
+                    override fun mark(readlimit: Int) = delegateStream.mark(readlimit)
+                    override fun reset() = delegateStream.reset()
+                }
+
                 if (sampleMimeType.contains("audio") && sampleMimeType.contains("raw")) {
-                    return@withContext file.inputStream
+                    return@withContext cascadingInputStream
                 } else if (sampleMimeType.contains("video")) {
-                    return@withContext file.inputStream
+                    return@withContext cascadingInputStream
                 } else if (sampleMimeType.contains("pics")) {
-                    return@withContext file.inputStream
+                    return@withContext cascadingInputStream
                 } else {
-                    val originalInputStream = file.inputStream
-                    return@withContext LimitedInputStream(originalInputStream, 5 * 1024 * 1024)
+                    return@withContext LimitedInputStream(cascadingInputStream, 5 * 1024 * 1024)
                 }
 
             } catch (e: Exception) {
@@ -816,4 +924,55 @@ object SmbUtils {
 
         return context
     }
+
+    /**
+     * 列出 SMB 目录下的文件和子目录
+     * @param host SMB 服务器地址
+     * @param shareName 共享名称
+     * @param path 目录路径（相对于共享根目录）
+     * @param username 用户名
+     * @param password 密码
+     * @return 目录内容列表（文件名 + 是否为目录）
+     */
+    suspend fun listSmbDirectory(
+        host: String,
+        shareName: String,
+        path: String,
+        username: String = "guest",
+        password: String = ""
+    ): List<SmbDirEntry> {
+        return withContext(Dispatchers.IO) {
+            // 复用 SmbConnectionManager 管理的连接, 避免每次创建/销毁
+            val connId = "$host:$shareName:$username"
+            val share = SmbConnectionManager.getInstance()
+                .getOrConnect(connId, host, shareName, username, password)
+                ?: throw IOException("Failed to connect to SMB share: smb://$host/$shareName")
+
+            try {
+                val dirPath = path.replace("/", "\\").let { if (it == "\\") "\\" else it.trimEnd('\\') }
+                val entries = mutableListOf<SmbDirEntry>()
+
+                for (item in share.list(dirPath)) {
+                    val itemName = item.fileName
+                    if (itemName == "." || itemName == "..") continue
+                    val itemPath = if (dirPath == "\\") "\\$itemName" else "$dirPath\\$itemName"
+                    val isDir = (item.fileAttributes and FileAttributes.FILE_ATTRIBUTE_DIRECTORY.value) != 0L
+                    entries.add(SmbDirEntry(
+                        name = itemName,
+                        isDirectory = isDir,
+                        path = itemPath.replace("\\", "/")
+                    ))
+                }
+                entries
+            } catch (e: Exception) {
+                throw IOException("Failed to list SMB directory: smb://$host/$shareName/$path", e)
+            }
+        }
+    }
 }
+
+data class SmbDirEntry(
+    val name: String,
+    val isDirectory: Boolean,
+    val path: String
+)
