@@ -11,20 +11,45 @@ plugins {
 android {
     namespace = "org.mz.mzdkplayer"
     compileSdk = 37
+    buildToolsVersion = "37.0.0"
+
+    // 从 local.properties 读取签名配置
+    val localProperties = rootProject.file("local.properties")
+    val properties = Properties().apply {
+        if (localProperties.exists()) {
+            load(localProperties.inputStream())
+        }
+    }
+    val storeFilePath = properties.getProperty("STORE_FILE", "")
+    val storePasswordVal = properties.getProperty("STORE_PASSWORD", "")
+    val keyAliasVal = properties.getProperty("KEY_ALIAS", "")
+    val keyPasswordVal = properties.getProperty("KEY_PASSWORD", "")
+
+    signingConfigs {
+        create("release") {
+            if (storeFilePath.isNotEmpty() && file(storeFilePath).exists()) {
+                storeFile = file(storeFilePath)
+                storePassword = storePasswordVal
+                keyAlias = keyAliasVal
+                keyPassword = keyPasswordVal
+            }
+        }
+    }
+
     defaultConfig {
         applicationId = "org.mz.mzdkplayer"
         minSdk = 23
         targetSdk = 37
-        versionCode = 97
-        versionName = "1.15.8"
+        versionCode = (project.findProperty("versionCode") as? String)?.toIntOrNull() ?: 97
+        versionName = (project.findProperty("versionName") as? String) ?: "1.15.8"
         ndk {
             //noinspection ChromeOsAbiSupport
-            abiFilters += listOf("armeabi-v7a", "arm64-v8a","x86")
-        }
-        val localProperties = rootProject.file("local.properties")
-        val properties = Properties().apply {
-            if (localProperties.exists()) {
-                load(localProperties.inputStream())
+            val targetAbi = project.findProperty("targetAbi") as? String
+            abiFilters += when (targetAbi) {
+                "arm64" -> listOf("arm64-v8a")
+                "arm32" -> listOf("armeabi-v7a")
+                "x86" -> listOf("x86")
+                else -> listOf("armeabi-v7a", "arm64-v8a", "x86")
             }
         }
 
@@ -34,15 +59,14 @@ android {
     splits {
         // 配置 ABI 拆分
         abi {
-            // 启用 ABI 拆分
-            isEnable = true
+            val targetAbi = project.findProperty("targetAbi") as? String
+            isEnable = targetAbi == null || targetAbi == "all"
 
-            // 清空默认的所有 ABI 列表，然后指定你需要拆分的架构
             reset()
-            include("armeabi-v7a", "arm64-v8a")
+            if (isEnable) {
+                include("armeabi-v7a", "arm64-v8a")
+            }
 
-            // 是否创建一个包含所有架构的“通用包”？
-            // 如果设为 true，会多生成一个全架构的 APK
             isUniversalApk = true
         }
     }
@@ -61,6 +85,7 @@ android {
         release {
             isMinifyEnabled = true
             isShrinkResources = true
+            signingConfig = signingConfigs.getByName("release")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -68,8 +93,8 @@ android {
         }
     }
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17
+        sourceCompatibility = JavaVersion.VERSION_21
+        targetCompatibility = JavaVersion.VERSION_21
         // isCoreLibraryDesugaringEnabled = true
 
     }
